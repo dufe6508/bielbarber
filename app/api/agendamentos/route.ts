@@ -90,7 +90,10 @@ export async function POST(request: Request) {
 
   // Mensalista paga depois (no fechamento do ciclo) → registra como "local"/pendente
   const formaFinal = ehMensalista ? "local" : formaPagamento;
-  const valorTotal = servicos.reduce((acc, s) => acc + Number(s.preco), 0);
+  const valorTotal = servicos.reduce(
+    (acc: number, s) => acc + Number(s.preco),
+    0
+  );
 
   const agendamento = await prisma.appointment.create({
     data: {

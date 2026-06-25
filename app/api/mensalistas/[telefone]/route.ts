@@ -51,7 +51,10 @@ export async function GET(
     })),
   }));
 
-  const total = agendamentos.reduce((acc, a) => acc + Number(a.valorTotal), 0);
+  const total = agendamentos.reduce(
+    (acc: number, a) => acc + Number(a.valorTotal),
+    0
+  );
 
   return NextResponse.json({
     mensalista: true,
