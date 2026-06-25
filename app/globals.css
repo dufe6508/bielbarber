@@ -1,0 +1,200 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Fontes */
+  --font-sans:    var(--font-inter);
+  --font-heading: var(--font-barlow);
+  --font-mono:    var(--font-jetbrains);
+
+  /* Tokens do shadcn → variáveis CSS */
+  --color-background:          var(--background);
+  --color-foreground:          var(--foreground);
+  --color-card:                var(--card);
+  --color-card-foreground:     var(--card-foreground);
+  --color-popover:             var(--popover);
+  --color-popover-foreground:  var(--popover-foreground);
+  --color-primary:             var(--primary);
+  --color-primary-foreground:  var(--primary-foreground);
+  --color-secondary:           var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:               var(--muted);
+  --color-muted-foreground:    var(--muted-foreground);
+  --color-accent:              var(--accent);
+  --color-accent-foreground:   var(--accent-foreground);
+  --color-destructive:         var(--destructive);
+  --color-border:              var(--border);
+  --color-input:               var(--input);
+  --color-ring:                var(--ring);
+
+  /* Tokens customizados do projeto */
+  --color-destaque:            var(--destaque);
+  --color-destaque-foreground: var(--destaque-foreground);
+  --color-dourado:             var(--dourado);
+  --color-dourado-foreground:  var(--dourado-foreground);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Sidebar */
+  --color-sidebar:                    var(--sidebar);
+  --color-sidebar-foreground:         var(--sidebar-foreground);
+  --color-sidebar-primary:            var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:             var(--sidebar-accent);
+  --color-sidebar-accent-foreground:  var(--sidebar-accent-foreground);
+  --color-sidebar-border:             var(--sidebar-border);
+  --color-sidebar-ring:               var(--sidebar-ring);
+
+  /* Border radius */
+  --radius-sm:  calc(var(--radius) * 0.6);
+  --radius-md:  calc(var(--radius) * 0.8);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+/* ─── Tema Claro (único por enquanto) ─────────────────────────────────────── */
+/* Paleta navy: branco + azul-marinho. Mono-acento (navy) — sem 2ª cor.
+   Referência: Oxford Blue #192338 · Space Cadet #1E2E4F · YInMn #31487A
+               Jordy Blue #8FB3E2 · Lavender #D9E1F1                          */
+:root {
+  /* Base — branco com leve frio azulado */
+  --background:          oklch(0.994 0.002 262);      /* quase branco, frio */
+  --foreground:          oklch(0.245 0.035 262);      /* Oxford Blue #192338 */
+
+  --card:                oklch(1 0 0);                /* branco puro */
+  --card-foreground:     oklch(0.245 0.035 262);
+
+  --popover:             oklch(1 0 0);
+  --popover-foreground:  oklch(0.245 0.035 262);
+
+  /* Primary = navy mais escuro — CTA e seleção */
+  --primary:             oklch(0.268 0.074 265);      /* navy profundo */
+  --primary-foreground:  oklch(0.985 0.004 262);
+
+  /* Secondary = azul-acinzentado claro */
+  --secondary:           oklch(0.958 0.009 262);
+  --secondary-foreground: oklch(0.305 0.072 264);
+
+  --muted:               oklch(0.965 0.008 262);
+  --muted-foreground:    oklch(0.475 0.035 263);      /* ≥4.5:1 em branco */
+
+  --accent:              oklch(0.928 0.022 262);      /* lavanda — item ativo */
+  --accent-foreground:   oklch(0.305 0.072 264);
+
+  --destructive:         oklch(0.577 0.245 27.325);
+
+  --border:              oklch(0.912 0.013 262);
+  --input:               oklch(0.912 0.013 262);
+  --ring:                oklch(0.38 0.095 265);        /* navy médio — focus */
+
+  /* Tokens customizados (mono-acento: tudo navy) */
+  --destaque:            oklch(0.268 0.074 265);
+  --destaque-foreground: oklch(0.985 0.004 262);
+  --dourado:             oklch(0.38 0.095 265);        /* repurposed → navy médio */
+  --dourado-foreground:  oklch(0.985 0.004 262);
+
+  /* Charts — rampa navy */
+  --chart-1: oklch(0.268 0.074 265);
+  --chart-2: oklch(0.38 0.095 265);
+  --chart-3: oklch(0.55 0.09 262);
+  --chart-4: oklch(0.68 0.08 258);
+  --chart-5: oklch(0.80 0.05 258);
+
+  /* Sidebar (navegação desktop / admin) — navy profundo */
+  --sidebar:                    oklch(0.245 0.035 262);  /* Oxford Blue */
+  --sidebar-foreground:         oklch(0.93 0.012 262);
+  --sidebar-primary:            oklch(0.74 0.078 258);   /* Jordy Blue — ativo */
+  --sidebar-primary-foreground: oklch(0.20 0.03 262);
+  --sidebar-accent:             oklch(0.305 0.05 263);
+  --sidebar-accent-foreground:  oklch(0.97 0.008 262);
+  --sidebar-border:             oklch(0.33 0.045 263);
+  --sidebar-ring:               oklch(0.74 0.078 258);
+
+  --radius: 0.75rem;
+}
+
+/* ─── Tema Escuro (estrutura pronta, entra na Fase 2) ─────────────────────── */
+.dark {
+  --background:          oklch(0.205 0.028 262);
+  --foreground:          oklch(0.95 0.008 262);
+  --card:                oklch(0.245 0.032 262);
+  --card-foreground:     oklch(0.95 0.008 262);
+  --popover:             oklch(0.245 0.032 262);
+  --popover-foreground:  oklch(0.95 0.008 262);
+  --primary:             oklch(0.74 0.078 258);       /* Jordy Blue clareia no escuro */
+  --primary-foreground:  oklch(0.205 0.028 262);
+  --secondary:           oklch(0.305 0.04 263);
+  --secondary-foreground: oklch(0.95 0.008 262);
+  --muted:               oklch(0.305 0.04 263);
+  --muted-foreground:    oklch(0.74 0.03 262);
+  --accent:              oklch(0.33 0.05 263);
+  --accent-foreground:   oklch(0.95 0.008 262);
+  --destructive:         oklch(0.704 0.191 22.216);
+  --border:              oklch(1 0 0 / 12%);
+  --input:               oklch(1 0 0 / 16%);
+  --ring:                oklch(0.74 0.078 258);
+  --destaque:            oklch(0.74 0.078 258);
+  --destaque-foreground: oklch(0.205 0.028 262);
+  --dourado:             oklch(0.74 0.078 258);
+  --dourado-foreground:  oklch(0.205 0.028 262);
+  --chart-1: oklch(0.74 0.078 258);
+  --chart-2: oklch(0.62 0.09 261);
+  --chart-3: oklch(0.55 0.09 262);
+  --chart-4: oklch(0.45 0.085 264);
+  --chart-5: oklch(0.85 0.05 257);
+  --sidebar:                    oklch(0.18 0.028 262);
+  --sidebar-foreground:         oklch(0.93 0.012 262);
+  --sidebar-primary:            oklch(0.74 0.078 258);
+  --sidebar-primary-foreground: oklch(0.18 0.028 262);
+  --sidebar-accent:             oklch(0.27 0.038 263);
+  --sidebar-accent-foreground:  oklch(0.95 0.008 262);
+  --sidebar-border:             oklch(1 0 0 / 10%);
+  --sidebar-ring:               oklch(0.74 0.078 258);
+}
+
+/* ─── Base ────────────────────────────────────────────────────────────────── */
+:root {
+  /* Curvas de easing fortes (UI sente responsiva) */
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+  /* Tipografia de títulos mais equilibrada */
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+/* Respeita preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

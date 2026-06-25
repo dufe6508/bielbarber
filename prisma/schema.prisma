@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AppointmentStatus {
+  agendado
+  concluido
+  cancelado
+  nao_compareceu
+}
+
+enum PaymentStatus {
+  pendente
+  pago
+  falhou
+}
+
+enum PaymentMethod {
+  pix
+  cartao
+  local
+}
+
+enum PackageType {
+  quantidade
+  combo
+}
+
+enum ClientPackageStatus {
+  ativo
+  expirado
+}
+
+enum SubscriptionStatus {
+  ativo
+  inativo
+}
+
+enum OrderPickupStatus {
+  pendente
+  pronto
+  retirado
+}
+
+enum ReferenceType {
+  agendamento
+  pedido
+  mensalista
+}
+
+enum NotificationType {
+  confirmacao
+  lembrete
+  cobranca
+}
+
+enum NotificationChannel {
+  whatsapp
+}
+
+enum NotificationStatus {
+  enviado
+  falhou
+}
+
+// ─── Modelos ──────────────────────────────────────────────────────────────────
+
+model Client {
+  id            String   @id @default(uuid())
+  nome          String
+  telefone      String   @unique
+  bloqueado     Boolean  @default(false)
+  podePagarLocal Boolean @default(false) @map("pode_pagar_local")
+  criadoEm      DateTime @default(now()) @map("criado_em")
+
+  agendamentos   Appointment[]
+  pedidos        Order[]
+  pacotesCliente ClientPackage[]
+  mensalidade    Subscription?
+  notificacoes   NotificationLog[]
+
+  @@map("clientes")
+}
+
+model Service {
+  id             String  @id @default(uuid())
+  nome           String
+  descricao      String?
+  duracaoMinutos Int     @map("duracao_minutos")
+  preco          Decimal @db.Decimal(10, 2)
+  ativo          Boolean @default(true)
+
+  agendamentoServicos AppointmentService[]
+  pacoteServicos      PackageService[]
+
+  @@map("servicos")
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  clienteId      String            @map("cliente_id")
+  data           DateTime          @db.Date
+  horarioInicio  String            @map("horario_inicio")
+  status         AppointmentStatus @default(agendado)
+  statusPagamento PaymentStatus    @default(pendente) @map("status_pagamento")
+  formaPagamento PaymentMethod     @map("forma_pagamento")
+  valorTotal     Decimal           @db.Decimal(10, 2) @map("valor_total")
+  criadoEm       DateTime          @default(now()) @map("criado_em")
+
+  cliente   Client               @relation(fields: [clienteId], references: [id])
+  servicos  AppointmentService[]
+  pagamento Payment?
+
+  @@map("agendamentos")
+}
+
+model AppointmentService {
+  agendamentoId String  @map("agendamento_id")
+  servicoId     String  @map("servico_id")
+  precoNaHora   Decimal @db.Decimal(10, 2) @map("preco_na_hora")
+
+  agendamento Appointment @relation(fields: [agendamentoId], references: [id])
+  servico     Service     @relation(fields: [servicoId], references: [id])
+
+  @@id([agendamentoId, servicoId])
+  @@map("agendamento_servicos")
+}
+
+model Product {
+  id                String  @id @default(uuid())
+  nome              String
+  descricao         String?
+  preco             Decimal @db.Decimal(10, 2)
+  quantidadeEstoque Int     @default(0) @map("quantidade_estoque")
+  urlImagem         String? @map("url_imagem")
+  ativo             Boolean @default(true)
+
+  itensPedido    OrderItem[]
+  pacoteProdutos PackageProduct[]
+
+  @@map("produtos")
+}
+
+model Package {
+  id           String      @id @default(uuid())
+  nome         String
+  descricao    String?
+  tipo         PackageType
+  preco        Decimal     @db.Decimal(10, 2)
+  validadeDias Int?        @map("validade_dias")
+  ativo        Boolean     @default(true)
+
+  servicos       PackageService[]
+  produtos       PackageProduct[]
+  pacotesCliente ClientPackage[]
+
+  @@map("pacotes")
+}
+
+model PackageService {
+  pacoteId  String @map("pacote_id")
+  servicoId String @map("servico_id")
+
+  pacote  Package @relation(fields: [pacoteId], references: [id])
+  servico Service @relation(fields: [servicoId], references: [id])
+
+  @@id([pacoteId, servicoId])
+  @@map("pacote_servicos")
+}
+
+model PackageProduct {
+  pacoteId   String @map("pacote_id")
+  produtoId  String @map("produto_id")
+  quantidade Int    @default(1)
+
+  pacote  Package @relation(fields: [pacoteId], references: [id])
+  produto Product @relation(fields: [produtoId], references: [id])
+
+  @@id([pacoteId, produtoId])
+  @@map("pacote_produtos")
+}
+
+model ClientPackage {
+  id            String              @id @default(uuid())
+  clienteId     String              @map("cliente_id")
+  pacoteId      String              @map("pacote_id")
+  compradoEm    DateTime            @default(now()) @map("comprado_em")
+  usosRestantes Int?                @map("usos_restantes")
+  expiraEm      DateTime?           @map("expira_em")
+  status        ClientPackageStatus @default(ativo)
+
+  cliente Client  @relation(fields: [clienteId], references: [id])
+  pacote  Package @relation(fields: [pacoteId], references: [id])
+
+  @@map("cliente_pacotes")
+}
+
+model Subscription {
+  id                  String             @id @default(uuid())
+  clienteId           String             @unique @map("cliente_id")
+  diaCobranca         Int                @map("dia_cobranca")
+  status              SubscriptionStatus @default(ativo)
+  totalCicloAtual     Decimal            @default(0) @db.Decimal(10, 2) @map("total_ciclo_atual")
+  dataUltimoPagamento DateTime?          @map("data_ultimo_pagamento")
+  valorUltimoPagamento Decimal?          @db.Decimal(10, 2) @map("valor_ultimo_pagamento")
+  proximaCobranca     DateTime?          @map("proxima_cobranca")
+  criadoEm            DateTime           @default(now()) @map("criado_em")
+
+  cliente    Client    @relation(fields: [clienteId], references: [id])
+  pagamentos Payment[]
+
+  @@map("mensalistas")
+}
+
+model Order {
+  id             String            @id @default(uuid())
+  clienteId      String            @map("cliente_id")
+  total          Decimal           @db.Decimal(10, 2)
+  statusPagamento PaymentStatus    @default(pendente) @map("status_pagamento")
+  formaPagamento PaymentMethod?    @map("forma_pagamento")
+  statusRetirada OrderPickupStatus @default(pendente) @map("status_retirada")
+  criadoEm       DateTime          @default(now()) @map("criado_em")
+
+  cliente   Client      @relation(fields: [clienteId], references: [id])
+  itens     OrderItem[]
+  pagamento Payment?
+
+  @@map("pedidos")
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  pedidoId    String  @map("pedido_id")
+  produtoId   String  @map("produto_id")
+  quantidade  Int
+  precoNaHora Decimal @db.Decimal(10, 2) @map("preco_na_hora")
+
+  pedido  Order   @relation(fields: [pedidoId], references: [id])
+  produto Product @relation(fields: [produtoId], references: [id])
+
+  @@map("itens_pedido")
+}
+
+model Payment {
+  id                     String        @id @default(uuid())
+  tipoReferencia         ReferenceType @map("tipo_referencia")
+  agendamentoId          String?       @unique @map("agendamento_id")
+  pedidoId               String?       @unique @map("pedido_id")
+  mensalistaId           String?       @map("mensalista_id")
+  periodoCobranca        DateTime?     @db.Date @map("periodo_cobranca")
+  valor                  Decimal       @db.Decimal(10, 2)
+  metodo                 PaymentMethod
+  status                 PaymentStatus @default(pendente)
+  idPagamentoMercadopago String?       @map("id_pagamento_mercadopago")
+  pagoEm                 DateTime?     @map("pago_em")
+  criadoEm               DateTime      @default(now()) @map("criado_em")
+
+  agendamento Appointment?  @relation(fields: [agendamentoId], references: [id])
+  pedido      Order?        @relation(fields: [pedidoId], references: [id])
+  mensalista  Subscription? @relation(fields: [mensalistaId], references: [id])
+
+  @@map("pagamentos")
+}
+
+model NotificationLog {
+  id        String              @id @default(uuid())
+  clienteId String              @map("cliente_id")
+  tipo      NotificationType
+  canal     NotificationChannel
+  status    NotificationStatus
+  conteudo  String
+  enviadoEm DateTime            @default(now()) @map("enviado_em")
+
+  cliente Client @relation(fields: [clienteId], references: [id])
+
+  @@map("log_notificacoes")
+}
