@@ -13,7 +13,7 @@ const rotuloPagamento: Record<string, string> = {
 };
 
 export function TicketConfirmacao() {
-  const { servicos, data, horario, formaPagamento, nome, valorTotal, reset } =
+  const { servicos, extras, data, horario, formaPagamento, nome, valorTotal, reset } =
     useBooking();
 
   return (
@@ -32,7 +32,7 @@ export function TicketConfirmacao() {
           className="flex size-16 items-center justify-center rounded-full bg-primary/10"
         >
           <div className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Check className="size-6" strokeWidth={3} />
+            <Check className="size-6" strokeWidth={3} aria-hidden="true" />
           </div>
         </motion.div>
         <div>
@@ -53,12 +53,9 @@ export function TicketConfirmacao() {
 
         <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           {/* Cabeçalho do ticket */}
-          <div className="bg-foreground px-5 py-4 text-center">
+          <div className="bg-foreground px-5 py-5 text-center">
             <p className="font-heading text-lg font-bold tracking-tight text-background">
               Biel Barber Shop
-            </p>
-            <p className="font-mono text-[11px] uppercase tracking-wider text-background/60">
-              Comprovante de agendamento
             </p>
           </div>
 
@@ -90,6 +87,29 @@ export function TicketConfirmacao() {
               </div>
             </div>
 
+            {extras.length > 0 && (
+              <div className="border-t border-dashed border-border pt-4">
+                <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Produtos
+                </p>
+                <div className="space-y-2">
+                  {extras.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-baseline justify-between gap-3"
+                    >
+                      <span className="text-sm text-foreground">
+                        {e.qtd}× {e.nome}
+                      </span>
+                      <span className="font-mono text-sm tabular-nums text-foreground">
+                        {formatarPreco(e.preco * e.qtd)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-baseline justify-between border-t border-dashed border-border pt-4">
               <span className="font-heading text-base font-semibold tracking-tight text-foreground">
                 Total
@@ -107,9 +127,9 @@ export function TicketConfirmacao() {
 
           {/* Rodapé */}
           <div className="flex items-center justify-center gap-1.5 border-t border-dashed border-border bg-muted/40 px-5 py-3">
-            <MapPin className="size-3.5 text-muted-foreground" />
+            <MapPin className="size-3.5 text-muted-foreground" aria-hidden="true" />
             <p className="text-xs text-muted-foreground">
-              Vale do Jatobá, Belo Horizonte
+              Av. Serrinha, 82 · Vale do Jatobá, BH · 30692-600
             </p>
           </div>
         </div>

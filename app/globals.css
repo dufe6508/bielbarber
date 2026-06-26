@@ -7,7 +7,7 @@
 @theme inline {
   /* Fontes */
   --font-sans:    var(--font-inter);
-  --font-heading: var(--font-barlow);
+  --font-heading: var(--font-display);
   --font-mono:    var(--font-jetbrains);
 
   /* Tokens shadcn → variáveis CSS */
@@ -35,6 +35,10 @@
   --color-destaque-foreground: var(--destaque-foreground);
   --color-dourado:             var(--dourado);
   --color-dourado-foreground:  var(--dourado-foreground);
+
+  /* Card selecionado — YInMn Blue (#31487A), funciona em light e dark */
+  --color-card-selected:            var(--card-selected);
+  --color-card-selected-foreground: var(--card-selected-foreground);
 
   /* Status semânticos — dark-aware, fora do sistema de destaque */
   --color-success:                  var(--success);
@@ -72,26 +76,27 @@
   --radius-xl:  calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
 
-  /* ─── Sombras navy-tinted, multi-layer ─────────────────────────────────
-     Tintadas com navy (hue 262) em vez de preto puro.
-     Duas camadas: umbra densa + penumbra difusa = depth real.          */
+  /* ─── Sombras onyx — neutras, multi-layer, mais densas ──────────────────
+     Hue neutro frio (255), chroma quase nulo. Umbra + penumbra.
+     Opacidade aumentada vs. versão navy: cards "assentam" no chão,
+     não flutuam. Soma com border definida = solidez real no light.     */
   --shadow-xs:
-    0 1px 2px oklch(0.24 0.035 262 / 0.05);
+    0 1px 2px oklch(0.20 0.006 255 / 0.06);
   --shadow-sm:
-    0 1px 2px oklch(0.24 0.035 262 / 0.04),
-    0 2px 6px oklch(0.24 0.035 262 / 0.05);
+    0 1px 2px oklch(0.20 0.006 255 / 0.06),
+    0 2px 6px oklch(0.20 0.006 255 / 0.07);
   --shadow-md:
-    0 2px 4px oklch(0.24 0.035 262 / 0.04),
-    0 6px 18px oklch(0.24 0.035 262 / 0.07);
+    0 2px 4px oklch(0.20 0.006 255 / 0.06),
+    0 6px 16px oklch(0.20 0.006 255 / 0.09);
   --shadow-lg:
-    0 4px 8px oklch(0.24 0.035 262 / 0.05),
-    0 14px 36px oklch(0.24 0.035 262 / 0.09);
+    0 4px 8px oklch(0.20 0.006 255 / 0.07),
+    0 14px 34px oklch(0.20 0.006 255 / 0.11);
   --shadow-xl:
-    0 8px 16px oklch(0.24 0.035 262 / 0.06),
-    0 24px 56px oklch(0.24 0.035 262 / 0.11);
+    0 8px 16px oklch(0.20 0.006 255 / 0.08),
+    0 24px 52px oklch(0.20 0.006 255 / 0.13);
   --shadow-2xl:
-    0 12px 28px oklch(0.24 0.035 262 / 0.07),
-    0 40px 80px oklch(0.24 0.035 262 / 0.13);
+    0 12px 28px oklch(0.20 0.006 255 / 0.09),
+    0 40px 78px oklch(0.20 0.006 255 / 0.16);
 }
 
 /* ─── Tema Claro ────────────────────────────────────────────────────────────
@@ -99,136 +104,183 @@
    Referência: Oxford Blue #192338 · Space Cadet #1E2E4F · YInMn #31487A
                Jordy Blue #8FB3E2 · Lavender #D9E1F1
 
-   SISTEMA DE ELEVAÇÃO:
-   background  = "chão" do app — ligeiramente afundado, cool-tinted
-   card        = branco puro — flutua acima com shadow (sem depender só de borda)
-   popover/modal = branco puro + shadow-xl                                     */
+   SISTEMA DE ELEVAÇÃO (light):
+   background  = cool-tinted near-white — chão do app
+   card        = branco puro — flutua com shadow
+   popover     = branco puro + shadow-xl                                      */
 :root {
-  /* ─── Superfícies ── */
-  --background:          oklch(0.972 0.006 262);    /* afundado — cool-tinted */
-  --foreground:          oklch(0.245 0.035 262);    /* Oxford Blue #192338    */
+  /* ─── Superfícies — ONYX MONO (frio, near-neutral) ───────────────────────
+     Hue fixo 258, chroma ≤0.006 (vs. 0.035 navy). Sem azul perceptível.
+     Elevação no light vem de 3 alavancas combinadas:
+       1. background mais fundo (0.966) que card (1.0) — 3.4 ΔL
+       2. border definida (0.872) — desenha a aresta
+       3. shadow onyx mais densa — assenta a peça                       */
+  --background:          oklch(0.966 0.0015 258);   /* cool near-white — chão */
+  --foreground:          oklch(0.220 0.005 265);    /* onyx #18191B — texto */
 
-  --card:                oklch(1 0 0);              /* branco puro — eleva    */
-  --card-foreground:     oklch(0.245 0.035 262);
+  --card:                oklch(1 0 0);              /* branco puro — eleva */
+  --card-foreground:     oklch(0.220 0.005 265);
 
   --popover:             oklch(1 0 0);
-  --popover-foreground:  oklch(0.245 0.035 262);
+  --popover-foreground:  oklch(0.220 0.005 265);
 
-  /* Primary = navy mais escuro — CTA e seleção */
-  --primary:             oklch(0.268 0.074 265);
-  --primary-foreground:  oklch(0.985 0.004 262);
+  /* Primary — onyx, CTA e seleção (o acento É o quase-preto) */
+  --primary:             oklch(0.232 0.006 265);
+  --primary-foreground:  oklch(0.985 0.001 258);
 
-  /* Secondary = azul-acinzentado claro */
-  --secondary:           oklch(0.958 0.009 262);
-  --secondary-foreground: oklch(0.305 0.072 264);
+  /* Secondary / Muted — separados por ~1.3 pontos de L */
+  --secondary:           oklch(0.944 0.002 258);
+  --secondary-foreground: oklch(0.300 0.006 265);
 
-  --muted:               oklch(0.960 0.009 262);
-  --muted-foreground:    oklch(0.475 0.035 263);    /* ≥4.5:1 em branco       */
+  --muted:               oklch(0.958 0.0018 258);
+  --muted-foreground:    oklch(0.468 0.005 262);    /* secundário — ≥4.5:1 em branco */
 
-  /* Accent — chroma elevado (0.022→0.050) para lavanda visível em hover/ativo */
-  --accent:              oklch(0.920 0.050 262);
-  --accent-foreground:   oklch(0.305 0.072 264);
+  /* Accent — hover/ativo, neutro e silencioso */
+  --accent:              oklch(0.918 0.003 258);
+  --accent-foreground:   oklch(0.290 0.006 265);
 
   --destructive:         oklch(0.577 0.245 27.325);
 
-  --border:              oklch(0.908 0.010 262);
-  --input:               oklch(0.908 0.010 262);
-  --ring:                oklch(0.38 0.095 265);
+  /* Border definida — desenha a aresta do card no light */
+  --border:              oklch(0.872 0.003 258);
+  --input:               oklch(0.872 0.003 258);
+  --ring:                oklch(0.380 0.006 265);
 
-  /* Mono-acento: tudo navy */
-  --destaque:            oklch(0.268 0.074 265);
-  --destaque-foreground: oklch(0.985 0.004 262);
-  --dourado:             oklch(0.38 0.095 265);
-  --dourado-foreground:  oklch(0.985 0.004 262);
+  /* Mono-acento: onyx. Tom secundário = grafite mais claro */
+  --destaque:            oklch(0.232 0.006 265);
+  --destaque-foreground: oklch(0.985 0.001 258);
+  --dourado:             oklch(0.380 0.006 265);
+  --dourado-foreground:  oklch(0.985 0.001 258);
 
-  /* ─── Status semânticos ── dark-aware ─── */
-  --success:                  oklch(0.52 0.13 145);
-  --success-foreground:       oklch(0.98 0.01 145);
-  --success-muted:            oklch(0.952 0.040 145);
-  --success-muted-foreground: oklch(0.36 0.11 145);
+  /* ─── Status semânticos — calibrados ao sistema (menos saturados) ──────── */
+  --success:                  oklch(0.505 0.115 145);
+  --success-foreground:       oklch(0.985 0.008 145);
+  --success-muted:            oklch(0.955 0.028 145);
+  --success-muted-foreground: oklch(0.360 0.100 145);
 
-  --danger:                   oklch(0.55 0.20 25);
-  --danger-foreground:        oklch(0.99 0.01 25);
-  --danger-muted:             oklch(0.965 0.038 25);
-  --danger-muted-foreground:  oklch(0.42 0.17 25);
+  --danger:                   oklch(0.535 0.185 25);
+  --danger-foreground:        oklch(0.990 0.006 25);
+  --danger-muted:             oklch(0.968 0.028 25);
+  --danger-muted-foreground:  oklch(0.420 0.158 25);
 
-  --neutral-muted:             oklch(0.942 0.010 262);
-  --neutral-muted-foreground:  oklch(0.475 0.035 263);
+  --neutral-muted:             oklch(0.940 0.002 258);
+  --neutral-muted-foreground:  oklch(0.468 0.005 262);
 
-  /* Charts — rampa navy */
-  --chart-1: oklch(0.268 0.074 265);
-  --chart-2: oklch(0.38 0.095 265);
-  --chart-3: oklch(0.55 0.09 262);
-  --chart-4: oklch(0.68 0.08 258);
-  --chart-5: oklch(0.80 0.05 258);
+  /* Charts — rampa onyx → prata (mono, sem azul) */
+  --chart-1: oklch(0.232 0.006 265);
+  --chart-2: oklch(0.380 0.006 265);
+  --chart-3: oklch(0.540 0.005 262);
+  --chart-4: oklch(0.680 0.004 258);
+  --chart-5: oklch(0.810 0.003 258);
 
-  /* Sidebar — navy profundo */
-  --sidebar:                    oklch(0.245 0.035 262);
-  --sidebar-foreground:         oklch(0.93 0.012 262);
-  --sidebar-primary:            oklch(0.74 0.078 258);
-  --sidebar-primary-foreground: oklch(0.20 0.03 262);
-  --sidebar-accent:             oklch(0.305 0.05 263);
-  --sidebar-accent-foreground:  oklch(0.97 0.008 262);
-  --sidebar-border:             oklch(0.33 0.045 263);
-  --sidebar-ring:               oklch(0.74 0.078 258);
+  /* Card selecionado — onyx quase-preto, contraste forte com branco */
+  --card-selected:            oklch(0.245 0.006 265);
+  --card-selected-foreground: oklch(0.985 0.001 258);
 
-  /* Radius base — reduzido de 0.75rem para 0.625rem (mais clean, menos bubbly) */
+  /* Sidebar — onyx charcoal (sem tint azul) */
+  --sidebar:                    oklch(0.146 0.003 258);
+  --sidebar-foreground:         oklch(0.928 0.003 258);
+  --sidebar-primary:            oklch(0.780 0.004 258);
+  --sidebar-primary-foreground: oklch(0.146 0.003 258);
+  --sidebar-accent:             oklch(0.216 0.004 258);
+  --sidebar-accent-foreground:  oklch(0.970 0.002 258);
+  --sidebar-border:             oklch(1 0 0 / 9%);
+  --sidebar-ring:               oklch(0.780 0.004 258);
+
   --radius: 0.625rem;
 }
 
-/* ─── Tema Escuro (Fase 2) ──────────────────────────────────────────────────*/
+/* ─── Tema Escuro — LUXURY REBUILD ──────────────────────────────────────────
+   ARQUITETURA DE ELEVAÇÃO (4 camadas materiais):
+   sidebar     = L 0.082 — mais fundo, "atrás" do conteúdo
+   background  = L 0.118 — chão do app — charcoal near-neutral
+   card        = L 0.168 — +5L — eleva com clareza
+   secondary   = L 0.200 — superfície elevada (dentro de cards, etc.)
+   popover     = L 0.220 — floating (dropdowns, modals)
+   accent      = L 0.252 — hover tint — camada mais clara antes do accent
+
+   NEUTRAL STRATEGY: chroma máximo 0.012 nos neutrals. O navy (C=0.082) é
+   ~7x mais saturado que o background — cria contraste cromático real.
+   Fim da contaminação azul: C passou de 0.028-0.04 para 0.006-0.012.
+
+   CASCATA DE TEXTO (4 steps):
+   foreground       = L 0.962 — primário
+   s-foreground     = L 0.915 — superfícies secundárias
+   sidebar-fg       = L 0.875 — sidebar (fundo escuro)
+   muted-foreground = L 0.565 — texto secundário/helper ≈5.5:1 no card  */
 .dark {
-  --background:          oklch(0.205 0.028 262);
-  --foreground:          oklch(0.95 0.008 262);
-  --card:                oklch(0.245 0.032 262);
-  --card-foreground:     oklch(0.95 0.008 262);
-  --popover:             oklch(0.245 0.032 262);
-  --popover-foreground:  oklch(0.95 0.008 262);
-  --primary:             oklch(0.74 0.078 258);
-  --primary-foreground:  oklch(0.205 0.028 262);
-  --secondary:           oklch(0.305 0.04 263);
-  --secondary-foreground: oklch(0.95 0.008 262);
-  --muted:               oklch(0.305 0.04 263);
-  --muted-foreground:    oklch(0.74 0.03 262);
-  --accent:              oklch(0.340 0.055 263);
-  --accent-foreground:   oklch(0.95 0.008 262);
-  --destructive:         oklch(0.704 0.191 22.216);
-  --border:              oklch(1 0 0 / 12%);
-  --input:               oklch(1 0 0 / 16%);
-  --ring:                oklch(0.74 0.078 258);
-  --destaque:            oklch(0.74 0.078 258);
-  --destaque-foreground: oklch(0.205 0.028 262);
-  --dourado:             oklch(0.74 0.078 258);
-  --dourado-foreground:  oklch(0.205 0.028 262);
+  /* ── Superfícies ─────────────────────────────────────────────────────── */
+  --background:          oklch(0.118 0.008 258);    /* charcoal — near-neutral */
+  --foreground:          oklch(0.946 0.006 258);    /* cool off-white — não puro, mais orgânico */
 
-  /* Status semânticos — modo escuro */
-  --success:                  oklch(0.68 0.12 145);
-  --success-foreground:       oklch(0.14 0.03 145);
-  --success-muted:            oklch(0.25 0.05 145);
-  --success-muted-foreground: oklch(0.72 0.10 145);
+  --card:                oklch(0.168 0.010 258);    /* +5L — elevação tier 1 */
+  --card-foreground:     oklch(0.946 0.006 258);
 
-  --danger:                   oklch(0.70 0.17 25);
-  --danger-foreground:        oklch(0.14 0.03 25);
-  --danger-muted:             oklch(0.26 0.06 25);
-  --danger-muted-foreground:  oklch(0.72 0.15 25);
+  --popover:             oklch(0.220 0.012 258);    /* floating — elevação tier 3 */
+  --popover-foreground:  oklch(0.946 0.006 258);
 
-  --neutral-muted:             oklch(0.305 0.04 263);
-  --neutral-muted-foreground:  oklch(0.74 0.03 262);
+  /* Primary — prata onyx. Sobre base neutra escura, salta sem cor. */
+  --primary:             oklch(0.860 0.004 258);    /* silver neutro */
+  --primary-foreground:  oklch(0.118 0.004 258);
 
-  --chart-1: oklch(0.74 0.078 258);
-  --chart-2: oklch(0.62 0.09 261);
-  --chart-3: oklch(0.55 0.09 262);
-  --chart-4: oklch(0.45 0.085 264);
-  --chart-5: oklch(0.85 0.05 257);
+  /* Secondary / Muted — elevação tier 2 */
+  --secondary:           oklch(0.200 0.011 258);
+  --secondary-foreground: oklch(0.915 0.006 258);
 
-  --sidebar:                    oklch(0.18 0.028 262);
-  --sidebar-foreground:         oklch(0.93 0.012 262);
-  --sidebar-primary:            oklch(0.74 0.078 258);
-  --sidebar-primary-foreground: oklch(0.18 0.028 262);
-  --sidebar-accent:             oklch(0.27 0.038 263);
-  --sidebar-accent-foreground:  oklch(0.95 0.008 262);
-  --sidebar-border:             oklch(1 0 0 / 10%);
-  --sidebar-ring:               oklch(0.74 0.078 258);
+  --muted:               oklch(0.200 0.011 258);
+  --muted-foreground:    oklch(0.565 0.014 260);    /* ~5.5:1 no card (L 0.168) */
+
+  /* Accent — hover tint. Distinct de muted (+5.2L, +0.007C) */
+  --accent:              oklch(0.252 0.018 258);
+  --accent-foreground:   oklch(0.930 0.006 258);
+
+  --destructive:         oklch(0.658 0.188 22);
+
+  /* Borders via white alpha — padrão premium */
+  --border:              oklch(1 0 0 / 9%);
+  --input:               oklch(1 0 0 / 13%);
+  --ring:                oklch(0.780 0.004 258);
+
+  /* Mono-acento — prata onyx */
+  --destaque:            oklch(0.860 0.004 258);
+  --destaque-foreground: oklch(0.118 0.004 258);
+  --dourado:             oklch(0.780 0.004 258);
+  --dourado-foreground:  oklch(0.118 0.004 258);
+
+  /* ── Status semânticos — dark ────────────────────────────────────────── */
+  --success:                  oklch(0.648 0.112 145);
+  --success-foreground:       oklch(0.118 0.008 258);
+  --success-muted:            oklch(0.196 0.040 145);    /* tinted surface */
+  --success-muted-foreground: oklch(0.698 0.092 145);
+
+  --danger:                   oklch(0.658 0.188 22);
+  --danger-foreground:        oklch(0.118 0.008 258);
+  --danger-muted:             oklch(0.212 0.055 22);     /* tinted surface */
+  --danger-muted-foreground:  oklch(0.715 0.155 22);
+
+  --neutral-muted:             oklch(0.200 0.011 258);
+  --neutral-muted-foreground:  oklch(0.565 0.014 260);
+
+  /* ── Charts — ramp onyx → prata (mono) ───────────────────────────────── */
+  --chart-1: oklch(0.860 0.004 258);
+  --chart-2: oklch(0.720 0.004 258);
+  --chart-3: oklch(0.600 0.004 258);
+  --chart-4: oklch(0.480 0.004 258);
+  --chart-5: oklch(0.360 0.004 258);
+
+  /* Card selecionado — superfície elevada neutra + ring prata */
+  --card-selected:            oklch(0.262 0.005 258);
+  --card-selected-foreground: oklch(0.946 0.004 258);
+
+  /* ── Sidebar — near-black charcoal, neutro ───────────────────────────── */
+  --sidebar:                    oklch(0.050 0.002 258);
+  --sidebar-foreground:         oklch(0.875 0.004 258);
+  --sidebar-primary:            oklch(0.860 0.004 258);
+  --sidebar-primary-foreground: oklch(0.050 0.002 258);
+  --sidebar-accent:             oklch(0.118 0.003 258);  /* hover = background level */
+  --sidebar-accent-foreground:  oklch(0.920 0.004 258);
+  --sidebar-border:             oklch(1 0 0 / 6%);
+  --sidebar-ring:               oklch(0.780 0.004 258);
 }
 
 /* ─── Base ──────────────────────────────────────────────────────────────────*/

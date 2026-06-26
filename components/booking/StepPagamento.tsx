@@ -7,7 +7,7 @@ import {
   QrCode,
   CreditCard,
   Store,
-  Wallet,
+  BadgeCheck,
   Check,
   Loader2,
   AlertCircle,
@@ -18,6 +18,7 @@ import {
   telefoneNumeros,
 } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+import { UpsellProdutos } from "./UpsellProdutos";
 
 const opcoes: {
   valor: FormaPagamento;
@@ -42,7 +43,7 @@ const opcoes: {
     valor: "mensalista",
     titulo: "Sou mensalista",
     descricao: "Soma no seu ciclo, paga depois",
-    icone: Wallet,
+    icone: BadgeCheck,
   },
 ];
 
@@ -51,9 +52,10 @@ type VerifResposta =
   | { mensalista: false; nome: string };
 
 export function StepPagamento() {
-  const { formaPagamento, setFormaPagamento, mensalista, setMensalista, setNome, setTelefone } =
+  const { formaPagamento, setFormaPagamento, mensalista, setMensalista, setNome, setTelefone, telefone } =
     useBooking();
-  const [telLocal, setTelLocal] = useState("");
+  // já temos o telefone do passo de identificação — pré-preenche a verificação
+  const [telLocal, setTelLocal] = useState(telefone);
 
   const verificar = useMutation<VerifResposta, Error, string>({
     mutationFn: async (tel: string) => {
@@ -132,7 +134,7 @@ export function StepPagamento() {
                       : "bg-muted text-muted-foreground"
                   )}
                 >
-                  <Icone className="size-5" />
+                  <Icone className="size-5" aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium text-foreground">
@@ -143,7 +145,7 @@ export function StepPagamento() {
                   </span>
                 </span>
                 {ativo && (
-                  <Check className="size-5 shrink-0 text-primary" strokeWidth={2.5} />
+                  <Check className="size-5 shrink-0 text-primary" strokeWidth={2.5} aria-hidden="true" />
                 )}
               </button>
 
@@ -162,7 +164,7 @@ export function StepPagamento() {
                         // Verificado com sucesso
                         <div className="flex items-center gap-3">
                           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            <Check className="size-5" strokeWidth={2.5} />
+                            <Check className="size-5" strokeWidth={2.5} aria-hidden="true" />
                           </span>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground">
@@ -198,7 +200,10 @@ export function StepPagamento() {
                               className="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-40"
                             >
                               {verificar.isPending ? (
-                                <Loader2 className="size-4 animate-spin" />
+                                <>
+                                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                                  <span className="sr-only">Verificando...</span>
+                                </>
                               ) : (
                                 "Verificar"
                               )}
@@ -208,7 +213,7 @@ export function StepPagamento() {
                           {/* Não é mensalista */}
                           {naoMensalista && (
                             <p className="flex items-start gap-2 text-sm text-destructive">
-                              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                               <span>
                                 {naoMensalista.split(" ")[0]}, você ainda não
                                 está cadastrado como mensalista. Fale com a
@@ -219,7 +224,7 @@ export function StepPagamento() {
                           {/* Telefone não encontrado */}
                           {verificar.isError && (
                             <p className="flex items-start gap-2 text-sm text-destructive">
-                              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                               {verificar.error.message}
                             </p>
                           )}
@@ -233,6 +238,8 @@ export function StepPagamento() {
           );
         })}
       </div>
+
+      <UpsellProdutos />
     </div>
   );
 }

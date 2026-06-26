@@ -1,9 +1,9 @@
 import {
   CalendarCheck,
   ShoppingBag,
-  Package,
+  Crown,
   CalendarDays,
-  Wallet,
+  BadgeCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -17,8 +17,8 @@ export type ItemNav = {
 export const navCliente: ItemNav[] = [
   { href: "/", rotulo: "Agendar", icone: CalendarCheck },
   { href: "/loja", rotulo: "Loja", icone: ShoppingBag },
-  { href: "/pacotes", rotulo: "Pacotes", icone: Package },
-  { href: "/mensalista", rotulo: "Mensalista", icone: Wallet },
+  { href: "/pacotes", rotulo: "Assinaturas", icone: Crown },
+  { href: "/mensalista", rotulo: "Mensalista", icone: BadgeCheck },
   { href: "/meus-agendamentos", rotulo: "Agendamentos", icone: CalendarDays },
 ];
 

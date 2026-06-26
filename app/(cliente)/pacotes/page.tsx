@@ -92,7 +92,7 @@ export default function PacotesPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-primary">
-                      <TipoIcone className="size-3.5" />
+                      <TipoIcone className="size-3.5" aria-hidden="true" />
                       {pkg.tipo === "combo" ? "Combo" : "Quantidade"}
                     </span>
                     <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight text-foreground">
@@ -116,6 +116,7 @@ export default function PacotesPage() {
                         <Check
                           className="size-4 shrink-0 text-primary"
                           strokeWidth={2.5}
+                          aria-hidden="true"
                         />
                         {item}
                       </li>
@@ -159,7 +160,7 @@ function EmptyPacotes() {
   return (
     <div className="mt-12 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-16 text-center">
       <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <PackageIcon className="size-6" />
+        <PackageIcon className="size-6" aria-hidden="true" />
       </span>
       <p className="font-medium text-foreground">Nenhum pacote disponível ainda</p>
       <p className="max-w-xs text-sm text-muted-foreground">

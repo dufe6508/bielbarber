@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Inter, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
+import { Inter, Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -9,11 +10,10 @@ const inter = Inter({
   weight: ["400", "500", "600"],
 });
 
-const barlowCondensed = Barlow_Condensed({
-  variable: "--font-barlow",
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-display",
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  style: ["normal", "italic"],
+  weight: ["500", "600", "700", "800"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -24,7 +24,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Biel Barber Shop",
-  description: "Agende seu corte no Biel Barber Shop — Vale do Jatobá, BH",
+  description:
+    "Agende seu corte no Biel Barber Shop — Av. Serrinha, 82 · Vale do Jatobá, BH",
 };
 
 export default function RootLayout({
@@ -35,11 +36,14 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${inter.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+      className={`${inter.variable} ${bricolage.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen flex flex-col">
-        {children}
-        <Toaster richColors position="top-center" />
+        <ThemeProvider>
+          {children}
+          <Toaster richColors position="top-center" />
+        </ThemeProvider>
       </body>
     </html>
   );

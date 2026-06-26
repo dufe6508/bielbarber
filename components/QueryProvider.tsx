@@ -8,7 +8,14 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 60 * 1000, refetchOnWindowFocus: false },
+          queries: {
+            // 5 min fresco: clicar num dia já carregado é instantâneo.
+            staleTime: 5 * 60 * 1000,
+            // mantém em cache 30 min mesmo sem observers (prefetch sobrevive)
+            gcTime: 30 * 60 * 1000,
+            refetchOnWindowFocus: false,
+            retry: 1,
+          },
         },
       })
   );

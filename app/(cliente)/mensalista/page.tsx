@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Loader2, Wallet, CalendarClock, Scissors } from "lucide-react";
@@ -13,6 +13,7 @@ import {
   formatarData,
   formatarPreco,
 } from "@/lib/utils/format";
+import { lembrarTelefone, telefoneLembrado } from "@/lib/utils/telefone";
 
 type Servico = { nome: string; preco: string };
 type Corte = {
@@ -46,10 +47,21 @@ export default function MensalistaPage() {
     },
   });
 
+  // Pré-preenche (e já entra) com o telefone usado no agendamento
+  useEffect(() => {
+    const t = telefoneLembrado();
+    if (t) {
+      setTelefone(formatarTelefone(t));
+      busca.mutate(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function buscar(e: React.FormEvent) {
     e.preventDefault();
     const tel = telefoneNumeros(telefone);
     if (tel.length < 10) return;
+    lembrarTelefone(tel);
     busca.mutate(tel);
   }
 

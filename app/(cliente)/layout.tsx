@@ -2,6 +2,7 @@ import { QueryProvider } from "@/components/QueryProvider";
 import { SidebarNav } from "@/components/SidebarNav";
 import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function ClienteLayout({
   children,
@@ -19,7 +20,13 @@ export default function ClienteLayout({
           {/* Mobile: barra superior */}
           <TopBar />
 
-          <main className="flex-1 overflow-x-hidden">{children}</main>
+          <main className="relative flex-1 overflow-x-hidden pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
+            {/* Toggle tema — desktop only, fixo no canto superior direito */}
+            <div className="fixed top-4 right-4 z-40 hidden md:flex">
+              <ThemeToggle className="size-10 rounded-xl border border-border bg-card text-muted-foreground shadow-md hover:text-foreground hover:bg-accent" />
+            </div>
+            {children}
+          </main>
 
           {/* Mobile: navegação inferior */}
           <BottomNav />

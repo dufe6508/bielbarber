@@ -15,9 +15,9 @@ import { TicketConfirmacao } from "./TicketConfirmacao";
 
 const PASSOS = [
   { titulo: "Serviços", descricao: "O que você quer fazer" },
+  { titulo: "Seus dados", descricao: "Nome e telefone" },
   { titulo: "Horário", descricao: "Dia e hora" },
   { titulo: "Pagamento", descricao: "Como prefere pagar" },
-  { titulo: "Seus dados", descricao: "Nome e telefone" },
 ] as const;
 
 const TOTAL_PASSOS = PASSOS.length;
@@ -33,17 +33,17 @@ export function BookingStepper() {
       case 0:
         return booking.servicos.length > 0;
       case 1:
-        return !!booking.data && !!booking.horario;
-      case 2:
-        if (!booking.formaPagamento) return false;
-        // Mensalista só avança se o telefone foi verificado
-        if (booking.formaPagamento === "mensalista") return !!booking.mensalista;
-        return true;
-      case 3:
         return (
           booking.nome.trim().length >= 2 &&
           telefoneNumeros(booking.telefone).length >= 10
         );
+      case 2:
+        return !!booking.data && !!booking.horario;
+      case 3:
+        if (!booking.formaPagamento) return false;
+        // Mensalista só avança se o telefone foi verificado
+        if (booking.formaPagamento === "mensalista") return !!booking.mensalista;
+        return true;
       default:
         return false;
     }
@@ -102,9 +102,9 @@ export function BookingStepper() {
         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
       >
         {passo === 0 && <StepServicos />}
-        {passo === 1 && <StepHorario />}
-        {passo === 2 && <StepPagamento />}
-        {passo === 3 && <StepIdentificacao />}
+        {passo === 1 && <StepIdentificacao />}
+        {passo === 2 && <StepHorario />}
+        {passo === 3 && <StepPagamento />}
       </motion.div>
     </AnimatePresence>
   );
@@ -126,7 +126,7 @@ export function BookingStepper() {
         type="button"
         onClick={ultimoPasso ? confirmar : avancar}
         disabled={!podeAvancar() || enviando}
-        className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        className="group inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-[transform,filter] hover:brightness-[1.10] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {enviando ? (
           <Loader2 className="size-4 animate-spin" />
@@ -135,7 +135,7 @@ export function BookingStepper() {
         ) : (
           <>
             Continuar
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" />
           </>
         )}
       </button>
@@ -241,6 +241,19 @@ export function BookingStepper() {
                       <span className="text-foreground">{s.nome}</span>
                       <span className="font-mono tabular-nums text-muted-foreground">
                         {formatarPreco(s.preco)}
+                      </span>
+                    </div>
+                  ))}
+                  {booking.extras.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-baseline justify-between gap-2 text-sm"
+                    >
+                      <span className="text-foreground">
+                        {e.qtd}× {e.nome}
+                      </span>
+                      <span className="font-mono tabular-nums text-muted-foreground">
+                        {formatarPreco(e.preco * e.qtd)}
                       </span>
                     </div>
                   ))}

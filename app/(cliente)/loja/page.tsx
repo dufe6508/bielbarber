@@ -18,6 +18,7 @@ type Produto = {
   nome: string;
   descricao: string | null;
   preco: string;
+  precoAntigo: string | null;
   quantidadeEstoque: number;
   urlImagem: string | null;
 };
@@ -119,13 +120,19 @@ export default function LojaPage() {
                     />
                   ) : (
                     <div className="flex size-full items-center justify-center text-muted-foreground/40">
-                      <PackageIcon className="size-10" strokeWidth={1.5} />
+                      <PackageIcon className="size-10" strokeWidth={1.5} aria-hidden="true" />
                     </div>
                   )}
-                  {semEstoque && (
+                  {semEstoque ? (
                     <span className="absolute right-3 top-3 rounded-full bg-foreground/85 px-2.5 py-1 text-[11px] font-medium text-background">
                       Esgotado
                     </span>
+                  ) : (
+                    p.precoAntigo && (
+                      <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm">
+                        Promo
+                      </span>
+                    )
                   )}
                 </div>
 
@@ -141,8 +148,15 @@ export default function LojaPage() {
                   )}
 
                   <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="font-mono text-lg font-bold tabular-nums text-foreground">
-                      {formatarPreco(p.preco)}
+                    <span className="flex items-baseline gap-2">
+                      {p.precoAntigo && (
+                        <span className="font-mono text-sm tabular-nums text-muted-foreground line-through">
+                          {formatarPreco(p.precoAntigo)}
+                        </span>
+                      )}
+                      <span className="font-mono text-lg font-bold tabular-nums text-foreground">
+                        {formatarPreco(p.preco)}
+                      </span>
                     </span>
 
                     {qtd === 0 ? (
@@ -152,7 +166,7 @@ export default function LojaPage() {
                         onClick={() => ajustar(p.id, 1, p.quantidadeEstoque)}
                         className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-transform active:scale-95 disabled:opacity-40"
                       >
-                        <Plus className="size-4" />
+                        <Plus className="size-4" aria-hidden="true" />
                         Adicionar
                       </button>
                     ) : (
@@ -163,7 +177,7 @@ export default function LojaPage() {
                           onClick={() => ajustar(p.id, -1, p.quantidadeEstoque)}
                           className="flex size-7 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"
                         >
-                          <Minus className="size-4" />
+                          <Minus className="size-4" aria-hidden="true" />
                         </button>
                         <span className="w-6 text-center font-mono text-sm font-semibold tabular-nums">
                           {qtd}
@@ -175,7 +189,7 @@ export default function LojaPage() {
                           onClick={() => ajustar(p.id, 1, p.quantidadeEstoque)}
                           className="flex size-7 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted disabled:opacity-30"
                         >
-                          <Plus className="size-4" />
+                          <Plus className="size-4" aria-hidden="true" />
                         </button>
                       </div>
                     )}
@@ -202,7 +216,7 @@ export default function LojaPage() {
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/80">
             <div className="flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary">
-                <ShoppingBag className="size-5" />
+                <ShoppingBag className="size-5" aria-hidden="true" />
               </span>
               <div className="leading-tight">
                 <p className="text-sm font-medium text-foreground">
@@ -236,7 +250,7 @@ function EmptyLoja() {
   return (
     <div className="mt-12 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-16 text-center">
       <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <ShoppingBag className="size-6" />
+        <ShoppingBag className="size-6" aria-hidden="true" />
       </span>
       <p className="font-medium text-foreground">Nenhum produto por aqui ainda</p>
       <p className="max-w-xs text-sm text-muted-foreground">

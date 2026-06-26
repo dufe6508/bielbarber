@@ -5,51 +5,43 @@ import "dotenv/config";
 const adapter = new PrismaPg(process.env.DIRECT_URL!);
 const prisma = new PrismaClient({ adapter });
 
-// Serviços de exemplo — substituir pela lista real do barbeiro
+// Lista real de serviços — tabela da barbearia
 const servicos = [
-  { nome: "Corte", descricao: "Tesoura ou máquina, do clássico ao degradê", duracaoMinutos: 30, preco: 35 },
-  { nome: "Corte + Barba", descricao: "Combo completo: corte na régua e barba feita", duracaoMinutos: 50, preco: 50 },
-  { nome: "Barba", descricao: "Modelagem, toalha quente e acabamento na navalha", duracaoMinutos: 20, preco: 25 },
+  { nome: "Corte Disfarçado (Fade)", descricao: "Degradê na régua, do baixo ao alto", duracaoMinutos: 40, preco: 45 },
+  { nome: "Corte Social", descricao: "Clássico, alinhado e discreto", duracaoMinutos: 30, preco: 30 },
+  { nome: "Corte Só Tesoura", descricao: "Acabamento todo na tesoura, mais natural", duracaoMinutos: 45, preco: 50 },
+  { nome: "Barba", descricao: "Modelagem, toalha quente e navalha", duracaoMinutos: 20, preco: 20 },
+  { nome: "Cavanhaque (Simples)", descricao: "Aparo e contorno do cavanhaque", duracaoMinutos: 10, preco: 10 },
+  { nome: "Barba c/ Tinta", descricao: "Barba feita com pigmentação", duracaoMinutos: 30, preco: 30 },
   { nome: "Sobrancelha", descricao: "Alinhamento na navalha ou pinça", duracaoMinutos: 10, preco: 10 },
-  { nome: "Pigmentação", descricao: "Disfarça falhas e dá densidade ao cabelo ou barba", duracaoMinutos: 40, preco: 40 },
-  { nome: "Pintura / Platinado", descricao: "Descoloração e coloração completa", duracaoMinutos: 90, preco: 120 },
-  { nome: "Nevou (luzes)", descricao: "Mechas e luzes pra um visual marcante", duracaoMinutos: 90, preco: 100 },
-  { nome: "Corte Infantil", descricao: "Paciência e cuidado com a criançada", duracaoMinutos: 30, preco: 30 },
+  { nome: "Pezinho", descricao: "Acabamento da nuca e pé do cabelo", duracaoMinutos: 10, preco: 10 },
+  { nome: "Tinta Preta", descricao: "Coloração preta para cabelo ou barba", duracaoMinutos: 30, preco: 25 },
+  { nome: "Tinta Colorida", descricao: "Coloração fashion, cores variadas", duracaoMinutos: 90, preco: 100 },
+  { nome: "Alisante", descricao: "Alisamento e controle de volume", duracaoMinutos: 40, preco: 30 },
+  { nome: "Luzes (Simples)", descricao: "Mechas para iluminar o visual", duracaoMinutos: 80, preco: 80 },
+  { nome: "Reflexo Alinhado", descricao: "Reflexos no sentido do corte", duracaoMinutos: 80, preco: 90 },
+  { nome: "Reflexo Arrepiado", descricao: "Reflexos com efeito arrepiado", duracaoMinutos: 90, preco: 100 },
+  { nome: "Platinado", descricao: "Descoloração completa até o platinado", duracaoMinutos: 120, preco: 150 },
+  { nome: "Desenho / Freestyle", descricao: "Traços e desenhos na máquina", duracaoMinutos: 15, preco: 15 },
 ];
 
-// Produtos de exemplo — imagens fictícias (Unsplash, temática grooming)
+// Produtos reais. Imagens em /public/produtos (mesma proporção nos cards).
 const produtos = [
   {
-    nome: "Pomada Modeladora",
-    descricao: "Fixação forte, efeito matte",
-    preco: 35,
+    nome: "Gel Boy",
+    descricao: "Mega fixação, ação prolongada — ForceMen",
+    preco: 30,
+    precoAntigo: 35, // promoção: de R$35 por R$30
     quantidadeEstoque: 12,
-    urlImagem:
-      "https://images.unsplash.com/photo-1621607512214-68297480165e?auto=format&fit=crop&w=600&q=70",
+    urlImagem: "/produtos/gel-boy.jpg",
   },
   {
-    nome: "Gel Fixador",
-    descricao: "Brilho e fixação",
-    preco: 22,
-    quantidadeEstoque: 20,
-    urlImagem:
-      "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?auto=format&fit=crop&w=600&q=70",
-  },
-  {
-    nome: "Óleo para Barba",
-    descricao: "Hidrata e dá brilho",
-    preco: 40,
+    nome: "Prime Fix",
+    descricao: "Cera modeladora premium · efeito matte, fixação forte",
+    preco: 35,
+    precoAntigo: null,
     quantidadeEstoque: 8,
-    urlImagem:
-      "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=600&q=70",
-  },
-  {
-    nome: "Shampoo Anticaspa",
-    descricao: "Limpeza profunda",
-    preco: 28,
-    quantidadeEstoque: 15,
-    urlImagem:
-      "https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&fit=crop&w=600&q=70",
+    urlImagem: "/produtos/prime-fix.jpg",
   },
 ];
 
@@ -59,24 +51,50 @@ async function main() {
     if (existe) {
       await prisma.service.update({
         where: { id: existe.id },
-        data: { descricao: s.descricao },
+        data: {
+          descricao: s.descricao,
+          duracaoMinutos: s.duracaoMinutos,
+          preco: s.preco,
+          ativo: true,
+        },
       });
     } else {
       await prisma.service.create({ data: s });
     }
   }
 
+  // Desativa qualquer serviço fora da lista canônica (some do app, sem quebrar FK)
+  const nomesCanonicos = servicos.map((s) => s.nome);
+  await prisma.service.updateMany({
+    where: { nome: { notIn: nomesCanonicos } },
+    data: { ativo: false },
+  });
+
   for (const p of produtos) {
     const existe = await prisma.product.findFirst({ where: { nome: p.nome } });
     if (existe) {
       await prisma.product.update({
         where: { id: existe.id },
-        data: { descricao: p.descricao, urlImagem: p.urlImagem },
+        data: {
+          descricao: p.descricao,
+          preco: p.preco,
+          precoAntigo: p.precoAntigo,
+          quantidadeEstoque: p.quantidadeEstoque,
+          urlImagem: p.urlImagem,
+          ativo: true,
+        },
       });
     } else {
       await prisma.product.create({ data: p });
     }
   }
+
+  // Desativa produtos fora da lista (somem do app, sem quebrar FK de pedidos)
+  const nomesProdutos = produtos.map((p) => p.nome);
+  await prisma.product.updateMany({
+    where: { nome: { notIn: nomesProdutos } },
+    data: { ativo: false },
+  });
 
   // ─── Mensalista demo (para testar a tela do mensalista) ──────────────────
   const TELEFONE_DEMO = "31988887777";
@@ -108,15 +126,15 @@ async function main() {
   });
 
   if (jaTem === 0) {
-    const corte = await prisma.service.findFirst({ where: { nome: "Corte" } });
-    const corteBarba = await prisma.service.findFirst({
-      where: { nome: "Corte + Barba" },
+    const corte = await prisma.service.findFirst({ where: { nome: "Corte Social" } });
+    const fade = await prisma.service.findFirst({
+      where: { nome: "Corte Disfarçado (Fade)" },
     });
     const barba = await prisma.service.findFirst({ where: { nome: "Barba" } });
 
     const cortesCiclo = [
       { dias: 2, horario: "10:00", svc: corte },
-      { dias: 9, horario: "15:30", svc: corteBarba },
+      { dias: 9, horario: "15:30", svc: fade },
       { dias: 16, horario: "11:00", svc: barba },
     ];
 

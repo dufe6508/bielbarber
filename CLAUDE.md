@@ -74,8 +74,8 @@ Hoje usa o **SalonSoft** (R$30/mês). O fluxo é: cliente entra no site → digi
 
 ### Visual / UI
 - **Fase atual: apenas tema claro.** O tema escuro entra depois — mas a estrutura de cores (variáveis/tokens) já nasce pensando em suportar os dois, pra não precisar refatorar tudo no futuro.
-- **Direção estética atual (rebrand jun/2026): soft, clean, minimalista, premium.** Branco + azul-marinho (navy), **mono-acento** (uma cor de destaque só: navy). Paleta-base: Oxford Blue `#192338`, Space Cadet `#1E2E4F`, YInMn Blue `#31487A`, Jordy Blue `#8FB3E2`, Lavender `#D9E1F1`. Tokens em OKLCH no `globals.css`. (A direção anterior — stone/concreto + laranja-queimado — foi substituída.)
-- Tipografia: fonte condensada para títulos (Barlow Condensed), limpa para corpo (Inter), mono para horários/preços (JetBrains Mono — efeito "ficha/comprovante")
+- **Direção estética atual (rebrand jun/2026): luxo minimalista, clean, premium.** Branco/off-white + **onyx mono (frio)** — grafite quase-preto neutro como acento único, **sem cor saturada** (hue ~258–265, chroma ≤0.006, sem azul perceptível). Elevação no light vem de 3 alavancas: background mais fundo que o card + border definida + sombra onyx densa. Tokens em OKLCH no `globals.css`. (Direções anteriores — navy mono-acento; antes, stone+laranja — substituídas.)
+- Tipografia: display grotesco editorial nos títulos (Bricolage Grotesque), sans limpa no corpo (Inter), mono em horários/preços (JetBrains Mono — efeito "ficha/precisão"). Substituiu Barlow Condensed (registro atlético/industrial demais).
 - Elemento de assinatura: a confirmação do agendamento é estilizada como um **ticket/ficha** (referência a ingresso)
 - **Multiplataforma** (não mais mobile-only): desktop com navegação lateral (sidebar navy), mobile com top bar + bottom nav. Continua mobile-friendly.
 
@@ -270,8 +270,8 @@ AdminUser
 ## 9. Diretrizes de design (resumo rápido para a IU)
 
 - **Fase atual: só tema claro.** Estrutura de cores em variáveis/tokens desde o início pra não precisar refatorar quando o tema escuro entrar (Fase 2)
-- Paleta (rebrand jun/2026): branco/off-white para fundo/superfície, **navy como destaque único (mono-acento)**. Base: Oxford Blue/Space Cadet/YInMn/Jordy Blue/Lavender. Sem 2ª cor — mensalistas/pacotes também usam navy.
-- Tipografia: condensada em títulos (Barlow), sans limpa no corpo (Inter), mono em horários e preços (JetBrains)
+- Paleta (rebrand jun/2026): branco/off-white para fundo/superfície, **onyx (grafite quase-preto neutro) como destaque único (mono-acento)**. Sem cor saturada, sem 2ª cor — mensalistas/pacotes também usam onyx.
+- Tipografia: display grotesco em títulos (Bricolage Grotesque), sans limpa no corpo (Inter), mono em horários e preços (JetBrains)
 - Elemento de assinatura: confirmação de agendamento estilizada como ticket/ficha
 - **Responsivo multiplataforma**: desktop = sidebar lateral; mobile = navegação inferior por abas (Agendar / Loja / Pacotes / Histórico)
 - Tom de copy: neutro e profissional, direto ao ponto, sem enrolação institucional

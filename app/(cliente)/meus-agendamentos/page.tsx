@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -12,6 +12,7 @@ import {
   Loader2,
   Calendar,
   CalendarClock,
+  Clock,
   X,
   Scissors,
 } from "lucide-react";
@@ -21,10 +22,11 @@ import { Input } from "@/components/ui/input";
 import {
   formatarTelefone,
   telefoneNumeros,
-  formatarData,
   formatarDataExtenso,
+  rotuloRelativo,
   formatarPreco,
 } from "@/lib/utils/format";
+import { lembrarTelefone, telefoneLembrado } from "@/lib/utils/telefone";
 import { cn } from "@/lib/utils";
 
 type Servico = { nome: string; preco: string };
@@ -47,6 +49,16 @@ type Visual = {
   podeAlterar: boolean;
 };
 
+function capitalizar(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// true quando a data é Hoje ou Amanhã (mostra chip de destaque)
+function relevante(data: string): boolean {
+  const r = rotuloRelativo(data);
+  return r === "Hoje" || r === "Amanhã";
+}
+
 function visualDe(a: Agendamento): Visual {
   const [h, m] = a.horarioInicio.split(":").map(Number);
   const inicio = new Date(a.data);
@@ -57,16 +69,16 @@ function visualDe(a: Agendamento): Visual {
   if (a.status === "cancelado")
     return {
       rotulo: "Cancelado",
-      badge: "bg-red-100 text-red-700",
-      faixa: "bg-red-500",
+      badge: "bg-danger-muted text-danger-muted-foreground",
+      faixa: "bg-danger",
       ativo: false,
       podeAlterar: false,
     };
   if (a.status === "nao_compareceu")
     return {
       rotulo: "Não compareceu",
-      badge: "bg-red-100 text-red-700",
-      faixa: "bg-red-400",
+      badge: "bg-danger-muted text-danger-muted-foreground",
+      faixa: "bg-danger/70",
       ativo: false,
       podeAlterar: false,
     };
@@ -74,15 +86,15 @@ function visualDe(a: Agendamento): Visual {
     return {
       rotulo: "Finalizado",
       badge: "bg-muted text-muted-foreground",
-      faixa: "bg-muted-foreground/40",
+      faixa: "bg-muted-foreground/30",
       ativo: false,
       podeAlterar: false,
     };
   // agendado, futuro
   return {
-    rotulo: "Agendado",
-    badge: "bg-emerald-100 text-emerald-700",
-    faixa: "bg-emerald-500",
+    rotulo: "Confirmado",
+    badge: "bg-success-muted text-success-muted-foreground",
+    faixa: "bg-success",
     ativo: true,
     podeAlterar: faltaMaisDe1h,
   };
@@ -92,6 +104,15 @@ export default function MeusAgendamentosPage() {
   const [telefone, setTelefone] = useState("");
   const [consultado, setConsultado] = useState<string | null>(null);
   const qc = useQueryClient();
+
+  // Pré-preenche (e já busca) com o telefone usado no agendamento
+  useEffect(() => {
+    const t = telefoneLembrado();
+    if (t) {
+      setTelefone(formatarTelefone(t));
+      setConsultado(t);
+    }
+  }, []);
 
   const consulta = useQuery<Resultado, Error>({
     queryKey: ["meus-agendamentos", consultado],
@@ -108,6 +129,7 @@ export default function MeusAgendamentosPage() {
     e.preventDefault();
     const tel = telefoneNumeros(telefone);
     if (tel.length < 10) return;
+    lembrarTelefone(tel);
     setConsultado(tel);
   }
 
@@ -117,7 +139,7 @@ export default function MeusAgendamentosPage() {
     <div className="mx-auto w-full max-w-3xl px-5 py-6 pb-28 md:px-8 md:py-12 md:pb-12">
       <PageHeader
         titulo="Meus agendamentos"
-        descricao="Digite seu telefone para ver, remarcar ou cancelar. Sem senha, sem cadastro."
+        descricao="Veja, remarque ou cancele seus horários."
       />
 
       <form onSubmit={buscar} className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -238,19 +260,36 @@ function CartaoAgendamento({
       <div className="p-4 pl-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <span
+              className={cn(
+                "flex size-11 shrink-0 items-center justify-center rounded-xl",
+                v.ativo
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
               <Scissors className="size-5" />
             </span>
             <div className="leading-tight">
-              <p className="font-medium text-foreground">{formatarData(a.data)}</p>
-              <p className="font-mono text-sm tabular-nums text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <p className="font-heading text-base font-semibold tracking-tight text-foreground">
+                  {capitalizar(formatarDataExtenso(a.data).replace(/\./g, ""))}
+                </p>
+                {relevante(a.data) && (
+                  <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
+                    {rotuloRelativo(a.data)}
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 flex items-center gap-1 font-mono text-sm tabular-nums text-muted-foreground">
+                <Clock className="size-3.5" aria-hidden="true" />
                 {a.horarioInicio}
               </p>
             </div>
           </div>
           <span
             className={cn(
-              "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+              "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
               v.badge
             )}
           >
@@ -259,7 +298,7 @@ function CartaoAgendamento({
         </div>
 
         <div className="mt-3 flex flex-wrap items-end justify-between gap-2 border-t border-dashed border-border pt-3">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-foreground">
             {a.servicos.map((s) => s.nome).join(", ")}
           </p>
           <span className="font-mono text-base font-bold tabular-nums text-foreground">

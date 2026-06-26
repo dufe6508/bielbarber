@@ -6,6 +6,14 @@ export type ServicoSelecionado = {
   preco: number;
 };
 
+// Produto adicionado no upsell do checkout (retira na hora do corte)
+export type ExtraSelecionado = {
+  id: string;
+  nome: string;
+  preco: number;
+  qtd: number;
+};
+
 export type FormaPagamento = "pix" | "cartao" | "local" | "mensalista";
 
 export type MensalistaInfo = { nome: string; telefone: string };
@@ -13,6 +21,7 @@ export type MensalistaInfo = { nome: string; telefone: string };
 type BookingState = {
   passo: number; // 0=serviços, 1=horário, 2=pagamento, 3=identificação, 4=ticket
   servicos: ServicoSelecionado[];
+  extras: ExtraSelecionado[]; // produtos do upsell
   data: string | null; // YYYY-MM-DD
   horario: string | null; // HH:MM
   formaPagamento: FormaPagamento | null;
@@ -21,6 +30,7 @@ type BookingState = {
   telefone: string;
 
   toggleServico: (s: ServicoSelecionado) => void;
+  setExtraQtd: (p: { id: string; nome: string; preco: number }, qtd: number) => void;
   setData: (d: string) => void;
   setHorario: (h: string) => void;
   setFormaPagamento: (f: FormaPagamento) => void;
@@ -39,6 +49,7 @@ type BookingState = {
 const estadoInicial = {
   passo: 0,
   servicos: [] as ServicoSelecionado[],
+  extras: [] as ExtraSelecionado[],
   data: null as string | null,
   horario: null as string | null,
   formaPagamento: null as FormaPagamento | null,
@@ -60,6 +71,15 @@ export const useBooking = create<BookingState>((set, get) => ({
       };
     }),
 
+  setExtraQtd: (p, qtd) =>
+    set((state) => {
+      const outros = state.extras.filter((x) => x.id !== p.id);
+      return {
+        extras:
+          qtd <= 0 ? outros : [...outros, { ...p, qtd }],
+      };
+    }),
+
   setData: (data) => set({ data, horario: null }),
   setHorario: (horario) => set({ horario }),
   setFormaPagamento: (formaPagamento) => set({ formaPagamento }),
@@ -72,5 +92,9 @@ export const useBooking = create<BookingState>((set, get) => ({
   irPara: (passo) => set({ passo }),
   reset: () => set(estadoInicial),
 
-  valorTotal: () => get().servicos.reduce((acc, s) => acc + s.preco, 0),
+  valorTotal: () => {
+    const s = get().servicos.reduce((acc, x) => acc + x.preco, 0);
+    const e = get().extras.reduce((acc, x) => acc + x.preco * x.qtd, 0);
+    return s + e;
+  },
 }));

@@ -133,13 +133,14 @@ model AppointmentService {
 }
 
 model Product {
-  id                String  @id @default(uuid())
+  id                String   @id @default(uuid())
   nome              String
   descricao         String?
-  preco             Decimal @db.Decimal(10, 2)
-  quantidadeEstoque Int     @default(0) @map("quantidade_estoque")
-  urlImagem         String? @map("url_imagem")
-  ativo             Boolean @default(true)
+  preco             Decimal  @db.Decimal(10, 2)
+  precoAntigo       Decimal? @db.Decimal(10, 2) @map("preco_antigo")
+  quantidadeEstoque Int      @default(0) @map("quantidade_estoque")
+  urlImagem         String?  @map("url_imagem")
+  ativo             Boolean  @default(true)
 
   itensPedido    OrderItem[]
   pacoteProdutos PackageProduct[]
