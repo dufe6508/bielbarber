@@ -5,8 +5,17 @@ import "dotenv/config";
 const adapter = new PrismaPg(process.env.DIRECT_URL!);
 const prisma = new PrismaClient({ adapter });
 
-// Lista real de serviços — tabela da barbearia
-const servicos = [
+// Lista real de serviços — tabela da barbearia.
+// slotsNecessarios: 2 = coloração (ocupa 2 horários seguidos). Default 1.
+type ServicoSeed = {
+  nome: string;
+  descricao: string;
+  duracaoMinutos: number;
+  preco: number;
+  slotsNecessarios?: number;
+};
+
+const servicos: ServicoSeed[] = [
   { nome: "Corte Disfarçado (Fade)", descricao: "Degradê na régua, do baixo ao alto", duracaoMinutos: 40, preco: 45 },
   { nome: "Corte Social", descricao: "Clássico, alinhado e discreto", duracaoMinutos: 30, preco: 30 },
   { nome: "Corte Só Tesoura", descricao: "Acabamento todo na tesoura, mais natural", duracaoMinutos: 45, preco: 50 },
@@ -15,13 +24,13 @@ const servicos = [
   { nome: "Barba c/ Tinta", descricao: "Barba feita com pigmentação", duracaoMinutos: 30, preco: 30 },
   { nome: "Sobrancelha", descricao: "Alinhamento na navalha ou pinça", duracaoMinutos: 10, preco: 10 },
   { nome: "Pezinho", descricao: "Acabamento da nuca e pé do cabelo", duracaoMinutos: 10, preco: 10 },
-  { nome: "Tinta Preta", descricao: "Coloração preta para cabelo ou barba", duracaoMinutos: 30, preco: 25 },
-  { nome: "Tinta Colorida", descricao: "Coloração fashion, cores variadas", duracaoMinutos: 90, preco: 100 },
-  { nome: "Alisante", descricao: "Alisamento e controle de volume", duracaoMinutos: 40, preco: 30 },
-  { nome: "Luzes (Simples)", descricao: "Mechas para iluminar o visual", duracaoMinutos: 80, preco: 80 },
-  { nome: "Reflexo Alinhado", descricao: "Reflexos no sentido do corte", duracaoMinutos: 80, preco: 90 },
-  { nome: "Reflexo Arrepiado", descricao: "Reflexos com efeito arrepiado", duracaoMinutos: 90, preco: 100 },
-  { nome: "Platinado", descricao: "Descoloração completa até o platinado", duracaoMinutos: 120, preco: 150 },
+  { nome: "Tinta Preta", descricao: "Coloração preta para cabelo ou barba", duracaoMinutos: 30, preco: 25, slotsNecessarios: 2 },
+  { nome: "Tinta Colorida", descricao: "Coloração fashion, cores variadas", duracaoMinutos: 90, preco: 100, slotsNecessarios: 2 },
+  { nome: "Alisante", descricao: "Alisamento e controle de volume", duracaoMinutos: 40, preco: 30, slotsNecessarios: 2 },
+  { nome: "Luzes (Simples)", descricao: "Mechas para iluminar o visual", duracaoMinutos: 80, preco: 80, slotsNecessarios: 2 },
+  { nome: "Reflexo Alinhado", descricao: "Reflexos no sentido do corte", duracaoMinutos: 80, preco: 90, slotsNecessarios: 2 },
+  { nome: "Reflexo Arrepiado", descricao: "Reflexos com efeito arrepiado", duracaoMinutos: 90, preco: 100, slotsNecessarios: 2 },
+  { nome: "Platinado", descricao: "Descoloração completa até o platinado", duracaoMinutos: 120, preco: 150, slotsNecessarios: 2 },
   { nome: "Desenho / Freestyle", descricao: "Traços e desenhos na máquina", duracaoMinutos: 15, preco: 15 },
 ];
 
@@ -55,11 +64,14 @@ async function main() {
           descricao: s.descricao,
           duracaoMinutos: s.duracaoMinutos,
           preco: s.preco,
+          slotsNecessarios: s.slotsNecessarios ?? 1,
           ativo: true,
         },
       });
     } else {
-      await prisma.service.create({ data: s });
+      await prisma.service.create({
+        data: { ...s, slotsNecessarios: s.slotsNecessarios ?? 1 },
+      });
     }
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
 
 export async function GET() {
   const agendamentos = await prisma.appointment.findMany({
@@ -13,14 +14,16 @@ type Body = {
   nome: string;
   telefone: string;
   data: string; // YYYY-MM-DD
-  horario: string; // HH:MM
+  horario: string; // HH:MM (início)
+  horarioFim?: string | null; // HH:MM (2º slot, coloração)
   formaPagamento: "pix" | "cartao" | "local" | "mensalista";
   servicoIds: string[];
 };
 
 export async function POST(request: Request) {
   const body = (await request.json()) as Body;
-  const { nome, telefone, data, horario, formaPagamento, servicoIds } = body;
+  const { nome, telefone, data, horario, horarioFim, formaPagamento, servicoIds } =
+    body;
 
   // Validação mínima
   if (!nome?.trim() || !telefone || !data || !horario || !formaPagamento) {
@@ -44,17 +47,33 @@ export async function POST(request: Request) {
     );
   }
 
-  // Slot ainda disponível?
-  const ocupado = await prisma.appointment.findFirst({
-    where: {
-      data: new Date(data),
-      horarioInicio: horario,
-      status: { notIn: ["cancelado"] },
-    },
-  });
-  if (ocupado) {
+  // Quantos slots o agendamento ocupa (coloração = 2)
+  const slotsNecessarios = Math.max(
+    1,
+    ...servicos.map((s) => s.slotsNecessarios)
+  );
+  const horariosNecessarios =
+    slotsNecessarios >= 2 ? [horario, proximaHora(horario)] : [horario];
+
+  // Se o cliente mandou o 2º horário, ele tem que ser o seguinte ao início
+  if (slotsNecessarios >= 2 && horarioFim && horarioFim !== proximaHora(horario)) {
     return NextResponse.json(
-      { error: "Esse horário acabou de ser preenchido. Escolha outro." },
+      { error: "Os 2 horários precisam ser seguidos." },
+      { status: 400 }
+    );
+  }
+
+  // Todos os horários necessários ainda livres? (respeita expediente e ocupação)
+  const livres = await getSlotsDisponiveis(data);
+  const conflito = horariosNecessarios.some((h) => !livres.includes(h));
+  if (conflito) {
+    return NextResponse.json(
+      {
+        error:
+          slotsNecessarios >= 2
+            ? "Esse serviço precisa de 2 horários seguidos livres. Escolha outro."
+            : "Esse horário acabou de ser preenchido. Escolha outro.",
+      },
       { status: 409 }
     );
   }
@@ -100,6 +119,7 @@ export async function POST(request: Request) {
       clienteId: cliente.id,
       data: new Date(data),
       horarioInicio: horario,
+      slots: slotsNecessarios,
       formaPagamento: formaFinal,
       valorTotal,
       servicos: {

@@ -18,9 +18,14 @@ type Servico = {
   nome: string;
   descricao: string | null;
   preco: string;
+  slotsNecessarios?: number;
 };
 
 const SPRING = { type: "spring", stiffness: 360, damping: 26 } as const;
+
+// Serviços que exigem 2 horários seguidos (coloração leva ~2h).
+// Provisório: derivado da categoria. Depois vira flag por serviço no admin/banco.
+const SECAO_DOIS_SLOTS = "Coloração";
 
 // Seções (páginas). Ordem dos nomes = ordem de exibição dentro da seção.
 const CATEGORIAS: { titulo: string; nomes: string[] }[] = [
@@ -56,6 +61,11 @@ const CATEGORIAS: { titulo: string; nomes: string[] }[] = [
     ],
   },
 ];
+
+// Nomes dos serviços que exigem 2 slots (seção Coloração)
+const NOMES_DOIS_SLOTS = new Set(
+  CATEGORIAS.find((c) => c.titulo === SECAO_DOIS_SLOTS)?.nomes ?? []
+);
 
 export function StepServicos() {
   const { servicos, toggleServico } = useBooking();
@@ -120,7 +130,7 @@ export function StepServicos() {
             Escolha os serviços
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Selecione um ou mais — arraste pro lado entre as seções.
+            Selecione um ou mais serviços.
           </p>
         </div>
 
@@ -150,9 +160,16 @@ export function StepServicos() {
       </div>
 
       {isLoading && (
-        <div className="space-y-2">
+        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+            <div key={i} className="flex items-center gap-3.5 px-4 py-3.5">
+              <div className="size-5 shrink-0 animate-pulse rounded-full bg-muted" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 w-1/3 animate-pulse rounded bg-muted" />
+                <div className="h-2.5 w-1/2 animate-pulse rounded bg-muted" />
+              </div>
+              <div className="h-3.5 w-12 animate-pulse rounded bg-muted" />
+            </div>
           ))}
         </div>
       )}
@@ -165,45 +182,54 @@ export function StepServicos() {
 
       {grupo && (
         <div>
-          {/* Abas nomeadas — mostram onde está cada tipo de serviço */}
+          {/* Abas nomeadas — controle segmentado, ancora a navegação das seções */}
           {totalPaginas > 1 && (
-            <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {paginas.map((p, i) => {
-                const ativo = i === paginaAtual;
-                const sel = selecionadosNaPagina(p.itens);
-                return (
-                  <button
-                    key={p.titulo}
-                    type="button"
-                    onClick={() => irPagina(i)}
-                    aria-current={ativo}
-                    className={cn(
-                      "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                      ativo
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border bg-card text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {p.titulo}
-                    {sel > 0 && (
-                      <span
-                        className={cn(
-                          "flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums",
-                          ativo
-                            ? "bg-primary-foreground/20"
-                            : "bg-primary text-primary-foreground"
-                        )}
-                      >
-                        {sel}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="-mx-1 mb-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="inline-flex gap-1 rounded-full border border-border bg-muted p-1">
+                {paginas.map((p, i) => {
+                  const ativo = i === paginaAtual;
+                  const sel = selecionadosNaPagina(p.itens);
+                  return (
+                    <button
+                      key={p.titulo}
+                      type="button"
+                      onClick={() => irPagina(i)}
+                      aria-current={ativo}
+                      className={cn(
+                        "relative inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
+                        ativo
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {ativo && (
+                        <motion.span
+                          layoutId="aba-ativa"
+                          transition={SPRING}
+                          className="absolute inset-0 rounded-full bg-primary shadow-sm"
+                        />
+                      )}
+                      <span className="relative">{p.titulo}</span>
+                      {sel > 0 && (
+                        <span
+                          className={cn(
+                            "relative flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums",
+                            ativo
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-primary text-primary-foreground"
+                          )}
+                        >
+                          {sel}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* Lista compacta — arrastável na horizontal */}
+          {/* Lista conectada — arrastável na horizontal */}
           <div className="relative overflow-hidden">
             <AnimatePresence mode="wait" custom={dir}>
               <motion.ul
@@ -221,7 +247,7 @@ export function StepServicos() {
                   reduzir ? { opacity: 0 } : { opacity: 0, x: dir >= 0 ? -32 : 32 }
                 }
                 transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-                className="touch-pan-y space-y-2"
+                className="touch-pan-y divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm"
               >
                 {grupo.itens.map((s) => {
                   const selecionado = servicos.some((x) => x.id === s.id);
@@ -234,16 +260,31 @@ export function StepServicos() {
                             id: s.id,
                             nome: s.nome,
                             preco: Number(s.preco),
+                            slotsNecessarios:
+                              s.slotsNecessarios ??
+                              (NOMES_DOIS_SLOTS.has(s.nome) ? 2 : 1),
                           })
                         }
                         aria-pressed={selecionado}
                         className={cn(
-                          "group flex w-full items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-[border-color,background-color] duration-200",
-                          selecionado
-                            ? "border-primary bg-accent"
-                            : "border-border bg-card hover:border-primary/35"
+                          "group relative flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200",
+                          selecionado ? "bg-accent" : "hover:bg-muted/60"
                         )}
                       >
+                        {/* Barra de acento — ancora visualmente a linha selecionada */}
+                        <AnimatePresence>
+                          {selecionado && (
+                            <motion.span
+                              initial={{ scaleY: 0 }}
+                              animate={{ scaleY: 1 }}
+                              exit={{ scaleY: 0 }}
+                              transition={SPRING}
+                              className="absolute inset-y-0 left-0 w-1 origin-center bg-primary"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </AnimatePresence>
+
                         <span
                           className={cn(
                             "flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-[border-color,background-color] duration-200",
@@ -291,6 +332,26 @@ export function StepServicos() {
               </motion.ul>
             </AnimatePresence>
           </div>
+
+          {/* Indicador de páginas + dica de arraste */}
+          {totalPaginas > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              {paginas.map((p, i) => (
+                <button
+                  key={p.titulo}
+                  type="button"
+                  onClick={() => irPagina(i)}
+                  aria-label={`Ir para ${p.titulo}`}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-300",
+                    i === paginaAtual
+                      ? "w-5 bg-primary"
+                      : "w-1.5 bg-border hover:bg-muted-foreground/40"
+                  )}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

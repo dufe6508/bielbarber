@@ -38,7 +38,11 @@ export function BookingStepper() {
           telefoneNumeros(booking.telefone).length >= 10
         );
       case 2:
-        return !!booking.data && !!booking.horario;
+        if (!booking.data || !booking.horario) return false;
+        // Coloração: só avança com os 2 horários marcados
+        if (booking.slotsNecessarios() === 2 && !booking.horarioFim)
+          return false;
+        return true;
       case 3:
         if (!booking.formaPagamento) return false;
         // Mensalista só avança se o telefone foi verificado
@@ -60,6 +64,7 @@ export function BookingStepper() {
           telefone: telefoneNumeros(booking.telefone),
           data: booking.data,
           horario: booking.horario,
+          horarioFim: booking.horarioFim,
           formaPagamento: booking.formaPagamento,
           servicoIds: booking.servicos.map((s) => s.id),
         }),

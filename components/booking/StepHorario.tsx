@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { useBooking } from "@/lib/store/booking";
 import {
   dataISOLocal,
@@ -14,18 +15,41 @@ import { slotsQueryOptions, prefetchSlots } from "@/lib/queries/slots";
 import { cn } from "@/lib/utils";
 import { CalendarSheet } from "./CalendarSheet";
 
-// Próximos N dias disponíveis (pula domingo=0 e segunda=1 — folga)
+const SPRING = { type: "spring", stiffness: 380, damping: 30 } as const;
+
+// Stagger dos slots de horário ao trocar de dia
+const GRADE = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.025, delayChildren: 0.04 } },
+} as const;
+const SLOT = {
+  hidden: { opacity: 0, y: 10, scale: 0.96 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.28, ease: [0.23, 1, 0.32, 1] },
+  },
+} as const;
+
+// Próximos N dias corridos a partir de hoje.
+// Dom/seg aparecem na régua (o barbeiro pode abrir), mas vêm sem horários.
 function proximosDias(qtd: number): Date[] {
   const dias: Date[] = [];
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
 
-  while (dias.length < qtd) {
-    const diaSemana = cursor.getDay();
-    if (diaSemana !== 0 && diaSemana !== 1) dias.push(new Date(cursor));
+  for (let i = 0; i < qtd; i++) {
+    dias.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return dias;
+}
+
+// "HH:00" → próxima hora "HH+1:00"
+function proximaHora(h: string): string {
+  const hora = Number(h.split(":")[0]);
+  return `${String(hora + 1).padStart(2, "0")}:00`;
 }
 
 // Agrupa horários por período do dia — dá estrutura à grade
@@ -45,7 +69,8 @@ function agruparPorPeriodo(slots: string[]) {
 }
 
 export function StepHorario() {
-  const { data, horario, setData, setHorario } = useBooking();
+  const { data, horario, horarioFim, setData, setHorario } = useBooking();
+  const slotsNecessarios = useBooking((s) => s.slotsNecessarios());
   const client = useQueryClient();
   const reduzir = useReducedMotion();
   const [qtdDias, setQtdDias] = useState(30);
@@ -92,6 +117,32 @@ export function StepHorario() {
   function rolar(dir: -1 | 1) {
     stripRef.current?.scrollBy({ left: dir * 280, behavior: "smooth" });
   }
+
+  // Seleção de horário. Serviços de 2 slots (coloração) exigem o horário
+  // seguinte também livre — senão avisa e não deixa marcar só um.
+  function escolherHorario(h: string) {
+    if (slotsNecessarios < 2) {
+      setHorario(h);
+      return;
+    }
+    const seguinte = proximaHora(h);
+    const seguinteLivre = (slots ?? []).includes(seguinte);
+    if (!seguinteLivre) {
+      toast.error("Esse serviço ocupa 2 horários seguidos.", {
+        description: "Escolha um horário com o seguinte também livre.",
+      });
+      return;
+    }
+    setHorario(h, seguinte);
+  }
+
+  // Dom/seg: aparecem na régua, mas sem expediente por padrão
+  const diaFechado = (() => {
+    if (!data) return false;
+    const [ano, mes, dia] = data.split("-").map(Number);
+    const dow = new Date(ano, mes - 1, dia).getDay();
+    return dow === 0 || dow === 1;
+  })();
 
   return (
     <div className="space-y-6">
@@ -151,38 +202,68 @@ export function StepHorario() {
           {dias.map((d) => {
             const iso = dataISOLocal(d);
             const ativo = data === iso;
+            const hoje = rotuloRelativo(d) === "Hoje";
             const mesAbrev = d
               .toLocaleDateString("pt-BR", { month: "short" })
               .replace(".", "");
             return (
-              <button
+              <motion.button
                 key={iso}
                 type="button"
                 onClick={() => setData(iso)}
                 onMouseEnter={() => prefetchSlots(client, iso)}
                 onFocus={() => prefetchSlots(client, iso)}
                 aria-pressed={ativo}
+                whileHover={reduzir ? undefined : { y: -3 }}
+                whileTap={{ scale: 0.94 }}
+                transition={SPRING}
                 className={cn(
-                  "flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-3 transition-[transform,border-color,background-color,box-shadow] active:scale-95",
+                  "relative flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-3",
                   ativo
-                    ? "border-primary bg-primary text-primary-foreground shadow-md"
+                    ? "border-primary text-primary-foreground"
                     : "border-border bg-card text-foreground shadow-xs hover:border-primary/40 hover:shadow-sm"
                 )}
               >
-                <span className="text-[11px] font-medium uppercase tracking-wide opacity-80">
+                {ativo && (
+                  <motion.span
+                    layoutId="dia-ativo"
+                    transition={SPRING}
+                    className="absolute inset-0 rounded-xl bg-primary shadow-md"
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="relative text-[11px] font-medium uppercase tracking-wide opacity-80">
                   {rotuloRelativo(d)}
                 </span>
-                <span className="font-mono text-lg font-semibold tabular-nums">
+                <span className="relative font-mono text-lg font-semibold tabular-nums">
                   {String(d.getDate()).padStart(2, "0")}
                 </span>
-                <span className="text-[10px] uppercase tracking-wide opacity-70">
+                <span className="relative text-[10px] uppercase tracking-wide opacity-70">
                   {mesAbrev}
                 </span>
-              </button>
+                {hoje && !ativo && (
+                  <span
+                    className="absolute right-2 top-2 size-1.5 rounded-full bg-primary"
+                    aria-hidden="true"
+                  />
+                )}
+              </motion.button>
             );
           })}
         </div>
       </div>
+
+      {/* Aviso: serviço de coloração ocupa 2 horários seguidos */}
+      {slotsNecessarios >= 2 && !diaFechado && (
+        <motion.p
+          initial={reduzir ? false : { opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-lg border border-primary/25 bg-accent px-3.5 py-2.5 text-xs text-foreground"
+        >
+          A coloração ocupa <strong>2 horários seguidos</strong>. Escolha o
+          horário de início — o seguinte é reservado junto.
+        </motion.p>
+      )}
 
       {/* Horários */}
       {!data ? null : isLoading ? (
@@ -195,8 +276,9 @@ export function StepHorario() {
         <AnimatePresence mode="wait">
           <motion.div
             key={data}
-            initial={reduzir ? { opacity: 0 } : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
+            variants={reduzir ? undefined : GRADE}
+            initial={reduzir ? { opacity: 0 } : "hidden"}
+            animate={reduzir ? { opacity: 1 } : "show"}
             exit={reduzir ? { opacity: 0 } : { opacity: 0, y: -8 }}
             transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
             className="space-y-5"
@@ -208,22 +290,47 @@ export function StepHorario() {
                 </p>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                   {g.itens.map((h) => {
-                    const ativo = horario === h;
+                    const ehInicio = horario === h;
+                    const ehFim = horarioFim === h;
+                    const ativo = ehInicio || ehFim;
                     return (
-                      <button
+                      <motion.button
                         key={h}
                         type="button"
-                        onClick={() => setHorario(h)}
+                        variants={reduzir ? undefined : SLOT}
+                        whileHover={reduzir ? undefined : { y: -2 }}
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => escolherHorario(h)}
                         aria-pressed={ativo}
                         className={cn(
-                          "flex h-11 items-center justify-center rounded-lg border font-mono text-sm font-medium tabular-nums transition-[transform,border-color,background-color,box-shadow] active:scale-95",
+                          "relative flex h-11 items-center justify-center rounded-lg border font-mono text-sm font-medium tabular-nums",
                           ativo
-                            ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                            ? "border-primary text-primary-foreground"
                             : "border-border bg-card text-foreground hover:border-primary/40"
                         )}
                       >
-                        {h}
-                      </button>
+                        <AnimatePresence>
+                          {ativo && (
+                            <motion.span
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.9 }}
+                              transition={SPRING}
+                              className={cn(
+                                "absolute inset-0 rounded-lg shadow-sm",
+                                ehFim ? "bg-primary/85" : "bg-primary"
+                              )}
+                              aria-hidden="true"
+                            />
+                          )}
+                        </AnimatePresence>
+                        <span className="relative">{h}</span>
+                        {ehFim && (
+                          <span className="absolute -top-1.5 -right-1.5 z-10 flex h-4 items-center rounded-full bg-foreground px-1 text-[9px] font-bold text-background shadow-sm">
+                            2ª
+                          </span>
+                        )}
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -233,7 +340,9 @@ export function StepHorario() {
         </AnimatePresence>
       ) : (
         <p className="rounded-xl border border-dashed border-border bg-muted/40 p-4 text-center text-sm text-muted-foreground">
-          Nenhum horário disponível neste dia. Tente outro.
+          {diaFechado
+            ? "Fechado neste dia. Escolha de terça a sábado."
+            : "Nenhum horário disponível neste dia. Tente outro."}
         </p>
       )}
 

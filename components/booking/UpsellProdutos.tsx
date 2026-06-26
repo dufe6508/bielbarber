@@ -40,7 +40,7 @@ export function UpsellProdutos() {
         <p className="text-sm font-medium text-foreground">Leve na hora do corte</p>
       </div>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Finalizadores e cuidados — retira direto na barbearia.
+        Finalizadores e cuidados pra retirar direto na barbearia.
       </p>
 
       <div className="-mx-4 mt-3 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

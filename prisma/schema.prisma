@@ -95,6 +95,8 @@ model Service {
   duracaoMinutos Int     @map("duracao_minutos")
   preco          Decimal @db.Decimal(10, 2)
   ativo          Boolean @default(true)
+  // Quantos slots de 1h o serviço ocupa. Coloração = 2. Admin edita depois.
+  slotsNecessarios Int   @default(1) @map("slots_necessarios")
 
   agendamentoServicos AppointmentService[]
   pacoteServicos      PackageService[]
@@ -107,6 +109,7 @@ model Appointment {
   clienteId      String            @map("cliente_id")
   data           DateTime          @db.Date
   horarioInicio  String            @map("horario_inicio")
+  slots          Int               @default(1) // qtd de horários de 1h ocupados
   status         AppointmentStatus @default(agendado)
   statusPagamento PaymentStatus    @default(pendente) @map("status_pagamento")
   formaPagamento PaymentMethod     @map("forma_pagamento")

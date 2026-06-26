@@ -5,6 +5,12 @@ import { Check, MapPin } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
 import { formatarPreco, formatarData } from "@/lib/utils/format";
 
+// "HH:00" → próxima hora "HH+1:00"
+function proximaHora(h: string): string {
+  const hora = Number(h.split(":")[0]);
+  return `${String(hora + 1).padStart(2, "0")}:00`;
+}
+
 const rotuloPagamento: Record<string, string> = {
   pix: "Pix",
   cartao: "Cartão",
@@ -13,8 +19,24 @@ const rotuloPagamento: Record<string, string> = {
 };
 
 export function TicketConfirmacao() {
-  const { servicos, extras, data, horario, formaPagamento, nome, valorTotal, reset } =
-    useBooking();
+  const {
+    servicos,
+    extras,
+    data,
+    horario,
+    horarioFim,
+    formaPagamento,
+    nome,
+    valorTotal,
+    reset,
+  } = useBooking();
+
+  // Coloração ocupa 2 slots → mostra a faixa (início ao fim do 2º horário)
+  const horarioTexto = horario
+    ? horarioFim
+      ? `${horario} – ${proximaHora(horarioFim)}`
+      : horario
+    : "—";
 
   return (
     <motion.div
@@ -66,7 +88,7 @@ export function TicketConfirmacao() {
               valor={data ? formatarData(data) : "—"}
               mono
             />
-            <LinhaTicket rotulo="Horário" valor={horario ?? "—"} mono />
+            <LinhaTicket rotulo="Horário" valor={horarioTexto} mono />
 
             <div className="border-t border-dashed border-border pt-4">
               <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">

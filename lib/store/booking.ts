@@ -4,6 +4,7 @@ export type ServicoSelecionado = {
   id: string;
   nome: string;
   preco: number;
+  slotsNecessarios?: number; // 2 = exige 2 horários seguidos (coloração). default 1
 };
 
 // Produto adicionado no upsell do checkout (retira na hora do corte)
@@ -23,7 +24,8 @@ type BookingState = {
   servicos: ServicoSelecionado[];
   extras: ExtraSelecionado[]; // produtos do upsell
   data: string | null; // YYYY-MM-DD
-  horario: string | null; // HH:MM
+  horario: string | null; // HH:MM (início)
+  horarioFim: string | null; // HH:MM (2º slot, quando o serviço exige 2 horários)
   formaPagamento: FormaPagamento | null;
   mensalista: MensalistaInfo | null; // preenchido quando verificado no passo de pagamento
   nome: string;
@@ -32,7 +34,7 @@ type BookingState = {
   toggleServico: (s: ServicoSelecionado) => void;
   setExtraQtd: (p: { id: string; nome: string; preco: number }, qtd: number) => void;
   setData: (d: string) => void;
-  setHorario: (h: string) => void;
+  setHorario: (h: string, fim?: string | null) => void;
   setFormaPagamento: (f: FormaPagamento) => void;
   setMensalista: (m: MensalistaInfo | null) => void;
   setNome: (n: string) => void;
@@ -44,6 +46,7 @@ type BookingState = {
   reset: () => void;
 
   valorTotal: () => number;
+  slotsNecessarios: () => number; // maior exigência entre os serviços (1 ou 2)
 };
 
 const estadoInicial = {
@@ -52,6 +55,7 @@ const estadoInicial = {
   extras: [] as ExtraSelecionado[],
   data: null as string | null,
   horario: null as string | null,
+  horarioFim: null as string | null,
   formaPagamento: null as FormaPagamento | null,
   mensalista: null as MensalistaInfo | null,
   nome: "",
@@ -80,8 +84,8 @@ export const useBooking = create<BookingState>((set, get) => ({
       };
     }),
 
-  setData: (data) => set({ data, horario: null }),
-  setHorario: (horario) => set({ horario }),
+  setData: (data) => set({ data, horario: null, horarioFim: null }),
+  setHorario: (horario, horarioFim = null) => set({ horario, horarioFim }),
   setFormaPagamento: (formaPagamento) => set({ formaPagamento }),
   setMensalista: (mensalista) => set({ mensalista }),
   setNome: (nome) => set({ nome }),
@@ -97,4 +101,7 @@ export const useBooking = create<BookingState>((set, get) => ({
     const e = get().extras.reduce((acc, x) => acc + x.preco * x.qtd, 0);
     return s + e;
   },
+
+  slotsNecessarios: () =>
+    Math.max(1, ...get().servicos.map((s) => s.slotsNecessarios ?? 1)),
 }));

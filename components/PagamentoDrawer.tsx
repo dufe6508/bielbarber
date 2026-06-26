@@ -84,7 +84,7 @@ export function PagamentoDrawer({
                       <QrCode className="size-24 text-foreground" strokeWidth={1} />
                     </div>
                     <p className="mt-3 text-xs text-muted-foreground">
-                      QR de exemplo — gateway real entra na próxima fase
+                      QR de exemplo. O gateway real entra na próxima fase.
                     </p>
                     <button
                       type="button"
@@ -121,7 +121,7 @@ export function PagamentoDrawer({
                     <CampoFake rotulo="Nome no cartão" valor="Como está no cartão" />
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    Formulário de exemplo — gateway real (Mercado Pago) entra na próxima fase.
+                    Formulário de exemplo. O gateway real (Mercado Pago) entra na próxima fase.
                   </p>
                   <button
                     type="button"
