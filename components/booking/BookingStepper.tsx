@@ -14,9 +14,9 @@ import { StepIdentificacao } from "./StepIdentificacao";
 import { TicketConfirmacao } from "./TicketConfirmacao";
 
 const PASSOS = [
+  { titulo: "Horário", descricao: "Dia e hora" },
   { titulo: "Serviços", descricao: "O que você quer fazer" },
   { titulo: "Seus dados", descricao: "Nome e telefone" },
-  { titulo: "Horário", descricao: "Dia e hora" },
   { titulo: "Pagamento", descricao: "Como prefere pagar" },
 ] as const;
 
@@ -31,18 +31,22 @@ export function BookingStepper() {
   function podeAvancar(): boolean {
     switch (passo) {
       case 0:
-        return booking.servicos.length > 0;
+        if (!booking.data || !booking.horario) return false;
+        // Coloração (se já escolhida): só avança com os 2 horários marcados
+        if (booking.slotsNecessarios() === 2 && !booking.horarioFim)
+          return false;
+        return true;
       case 1:
+        if (booking.servicos.length === 0) return false;
+        // Coloração escolhida depois do horário precisa do 2º slot reservado
+        if (booking.slotsNecessarios() === 2 && !booking.horarioFim)
+          return false;
+        return true;
+      case 2:
         return (
           booking.nome.trim().length >= 2 &&
           telefoneNumeros(booking.telefone).length >= 10
         );
-      case 2:
-        if (!booking.data || !booking.horario) return false;
-        // Coloração: só avança com os 2 horários marcados
-        if (booking.slotsNecessarios() === 2 && !booking.horarioFim)
-          return false;
-        return true;
       case 3:
         if (!booking.formaPagamento) return false;
         // Mensalista só avança se o telefone foi verificado
@@ -106,9 +110,9 @@ export function BookingStepper() {
         exit={{ opacity: 0, x: -16 }}
         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
       >
-        {passo === 0 && <StepServicos />}
-        {passo === 1 && <StepIdentificacao />}
-        {passo === 2 && <StepHorario />}
+        {passo === 0 && <StepHorario />}
+        {passo === 1 && <StepServicos />}
+        {passo === 2 && <StepIdentificacao />}
         {passo === 3 && <StepPagamento />}
       </motion.div>
     </AnimatePresence>

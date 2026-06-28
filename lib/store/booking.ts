@@ -20,7 +20,7 @@ export type FormaPagamento = "pix" | "cartao" | "local" | "mensalista";
 export type MensalistaInfo = { nome: string; telefone: string };
 
 type BookingState = {
-  passo: number; // 0=serviços, 1=horário, 2=pagamento, 3=identificação, 4=ticket
+  passo: number; // 0=horário, 1=serviços, 2=identificação, 3=pagamento, 4=ticket
   servicos: ServicoSelecionado[];
   extras: ExtraSelecionado[]; // produtos do upsell
   data: string | null; // YYYY-MM-DD

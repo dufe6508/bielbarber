@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AnimatePresence,
@@ -8,10 +8,17 @@ import {
   useReducedMotion,
   type PanInfo,
 } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, Layers } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
+import { slotsQueryOptions } from "@/lib/queries/slots";
 import { formatarPreco } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+
+// "HH:00" → próxima hora "HH+1:00"
+function proximaHora(h: string): string {
+  const hora = Number(h.split(":")[0]);
+  return `${String(hora + 1).padStart(2, "0")}:00`;
+}
 
 type Servico = {
   id: string;
@@ -68,10 +75,45 @@ const NOMES_DOIS_SLOTS = new Set(
 );
 
 export function StepServicos() {
-  const { servicos, toggleServico } = useBooking();
+  const {
+    servicos,
+    toggleServico,
+    data: dataAg,
+    horario,
+    horarioFim,
+    setHorario,
+    slotsNecessarios: calcSlots,
+  } = useBooking();
+  const slotsNecessarios = calcSlots();
   const reduzir = useReducedMotion();
   const [pagina, setPagina] = useState(0);
   const [dir, setDir] = useState(0);
+
+  // Horários livres do dia já escolhido (cache do passo de horário).
+  const { data: slots } = useQuery(slotsQueryOptions(dataAg));
+
+  // Coloração escolhida depois do horário: reserva o 2º slot seguinte se livre,
+  // ou limpa a reserva quando não cabe / deixou de precisar.
+  useEffect(() => {
+    if (slotsNecessarios >= 2) {
+      if (!horario || !slots) return;
+      const seguinte = proximaHora(horario);
+      if (slots.includes(seguinte)) {
+        if (horarioFim !== seguinte) setHorario(horario, seguinte);
+      } else if (horarioFim) {
+        setHorario(horario, null);
+      }
+    } else if (horario && horarioFim) {
+      setHorario(horario, null);
+    }
+  }, [slotsNecessarios, horario, horarioFim, slots, setHorario]);
+
+  // Horário atual não comporta os 2 slots da coloração → precisa voltar e trocar.
+  const avisoColoracao =
+    slotsNecessarios >= 2 &&
+    !!horario &&
+    !!slots &&
+    !slots.includes(proximaHora(horario));
 
   const { data, isLoading, isError } = useQuery<Servico[]>({
     queryKey: ["servicos"],
@@ -158,6 +200,25 @@ export function StepServicos() {
           )}
         </AnimatePresence>
       </div>
+
+      {avisoColoracao && (
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+            <Layers className="size-4" aria-hidden="true" />
+          </span>
+          <div className="space-y-0.5">
+            <p className="text-sm font-semibold text-foreground">
+              Coloração ocupa 2 horários seguidos
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              O horário das{" "}
+              <strong className="font-medium text-foreground">{horario}</strong>{" "}
+              não tem o seguinte livre. Volte e escolha um horário com 2 vagas
+              seguidas.
+            </p>
+          </div>
+        </div>
+      )}
 
       {isLoading && (
         <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
