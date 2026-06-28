@@ -1,14 +1,10 @@
 "use client";
 
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -62,64 +58,79 @@ function TooltipBox({
   );
 }
 
-// Área empilhada: receita serviços + loja por dia.
-export function ReceitaAreaChart({
-  dados,
+type DiaReceita = { data: string; servicos: number; loja: number; total?: number };
+
+// Tooltip do gráfico principal: total do dia + quebra serviços/loja.
+function TooltipDia({
+  active,
+  payload,
 }: {
-  dados: { data: string; servicos: number; loja: number }[];
+  active?: boolean;
+  payload?: { payload: DiaReceita }[];
 }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  const total = p.servicos + p.loja;
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <AreaChart data={dados} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-        <defs>
-          <linearGradient id="gServ" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={COR} stopOpacity={0.32} />
-            <stop offset="100%" stopColor={COR} stopOpacity={0.02} />
-          </linearGradient>
-          <linearGradient id="gLoja" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={EIXO} stopOpacity={0.22} />
-            <stop offset="100%" stopColor={EIXO} stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
+    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
+      <p className="mb-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+        {rotuloDia(p.data)}
+      </p>
+      <p className="mb-1.5 font-mono text-sm font-semibold tabular-nums text-foreground">
+        {moedaCurta(total)}
+      </p>
+      <p className="flex items-center gap-1.5 text-muted-foreground">
+        <span className="inline-block size-2 rounded-full" style={{ background: COR }} />
+        Serviços <span className="ml-auto font-mono tabular-nums">{moedaCurta(p.servicos)}</span>
+      </p>
+      {p.loja > 0 && (
+        <p className="mt-0.5 flex items-center gap-1.5 text-muted-foreground">
+          <span className="inline-block size-2 rounded-full" style={{ background: EIXO }} />
+          Loja <span className="ml-auto font-mono tabular-nums">{moedaCurta(p.loja)}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Receita total por dia — barras finas, canto arredondado, pico destacado.
+// Detalhe serviços/loja fica no tooltip (evita empilhamento ruidoso).
+export function ReceitaBarChart({ dados }: { dados: DiaReceita[] }) {
+  const linhas = dados.map((d) => ({ ...d, total: d.servicos + d.loja }));
+  const max = Math.max(0, ...linhas.map((d) => d.total));
+  if (max === 0)
+    return (
+      <p className="py-12 text-center text-sm text-muted-foreground">
+        Sem receita no período.
+      </p>
+    );
+  return (
+    <ResponsiveContainer width="100%" height={210}>
+      <BarChart data={linhas} margin={{ top: 8, right: 4, left: -14, bottom: 0 }} barCategoryGap="28%">
+        <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey="data"
           tickFormatter={rotuloDia}
           tick={{ fontSize: 10, fill: EIXO }}
           tickLine={false}
           axisLine={false}
-          minTickGap={24}
+          minTickGap={28}
         />
         <YAxis
           tickFormatter={moedaCurta}
           tick={{ fontSize: 10, fill: EIXO }}
           tickLine={false}
           axisLine={false}
-          width={48}
+          width={46}
+          tickCount={4}
         />
-        <Tooltip
-          content={<TooltipBox moeda />}
-          labelFormatter={(l) => rotuloDia(String(l))}
-        />
-        <Area
-          type="monotone"
-          dataKey="servicos"
-          name="Serviços"
-          stackId="1"
-          stroke={COR}
-          strokeWidth={2}
-          fill="url(#gServ)"
-        />
-        <Area
-          type="monotone"
-          dataKey="loja"
-          name="Loja"
-          stackId="1"
-          stroke={EIXO}
-          strokeWidth={1.5}
-          fill="url(#gLoja)"
-        />
-      </AreaChart>
+        <Tooltip content={<TooltipDia />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
+        <Bar dataKey="total" name="Total" radius={[4, 4, 0, 0]} maxBarSize={16}>
+          {linhas.map((d, i) => (
+            <Cell key={i} fill={COR} fillOpacity={d.total === max ? 1 : 0.5} />
+          ))}
+        </Bar>
+      </BarChart>
     </ResponsiveContainer>
   );
 }
@@ -164,61 +175,6 @@ export function RankingBarChart({
   );
 }
 
-// Donut: receita por fonte. Tons de onyx (mono-acento) por opacidade.
-export function FonteDonutChart({
-  dados,
-}: {
-  dados: { nome: string; valor: number }[];
-}) {
-  const filtrado = dados.filter((d) => d.valor > 0);
-  if (!filtrado.length)
-    return (
-      <p className="py-10 text-center text-sm text-muted-foreground">
-        Sem receita no período.
-      </p>
-    );
-  const total = filtrado.reduce((s, d) => s + d.valor, 0);
-  return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row">
-      <ResponsiveContainer width="100%" height={180} className="!w-auto sm:!w-1/2">
-        <PieChart>
-          <Pie
-            data={filtrado}
-            dataKey="valor"
-            nameKey="nome"
-            innerRadius={48}
-            outerRadius={78}
-            paddingAngle={2}
-            strokeWidth={0}
-          >
-            {filtrado.map((_, i) => (
-              <Cell key={i} fill={COR} fillOpacity={1 - i * 0.18} />
-            ))}
-          </Pie>
-          <Tooltip content={<TooltipBox moeda />} />
-        </PieChart>
-      </ResponsiveContainer>
-      <ul className="w-full space-y-2 sm:w-1/2">
-        {filtrado.map((d, i) => (
-          <li key={d.nome} className="flex items-center gap-2 text-sm">
-            <span
-              className="inline-block size-2.5 rounded-full"
-              style={{ background: COR, opacity: 1 - i * 0.18 }}
-            />
-            <span className="text-muted-foreground">{d.nome}</span>
-            <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
-              {moedaCurta(d.valor)}
-            </span>
-            <span className="w-10 text-right font-mono text-xs text-muted-foreground">
-              {Math.round((d.valor / total) * 100)}%
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 // Barras verticais: ocupação por hora.
 export function OcupacaoBarChart({
   dados,
@@ -250,6 +206,42 @@ export function OcupacaoBarChart({
         />
         <Tooltip content={<TooltipBox />} cursor={{ fill: "var(--muted)" }} />
         <Bar dataKey="total" name="Atend." fill={COR} radius={[6, 6, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// Mini barras verticais genéricas (horários fortes, dias fortes). Destaca a
+// barra de maior valor; demais ficam esmaecidas — leitura instantânea do pico.
+export function MiniBarChart({
+  dados,
+  height = 150,
+}: {
+  dados: { rotulo: string; total: number }[];
+  height?: number;
+}) {
+  if (!dados.length)
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">Sem dados.</p>
+    );
+  const max = Math.max(...dados.map((d) => d.total));
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={dados} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barCategoryGap="22%">
+        <XAxis
+          dataKey="rotulo"
+          tick={{ fontSize: 10, fill: EIXO }}
+          tickLine={false}
+          axisLine={false}
+          interval={0}
+        />
+        <YAxis hide allowDecimals={false} />
+        <Tooltip content={<TooltipBox />} cursor={{ fill: "var(--muted)" }} />
+        <Bar dataKey="total" name="Atend." radius={[5, 5, 0, 0]}>
+          {dados.map((d, i) => (
+            <Cell key={i} fill={COR} fillOpacity={d.total === max ? 1 : 0.32} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

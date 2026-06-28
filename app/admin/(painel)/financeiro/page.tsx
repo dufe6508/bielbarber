@@ -1,24 +1,20 @@
-import { Wallet, Users, TrendingUp, UserPlus } from "lucide-react";
-import { AdminPage, AdminHeader, SectionCard } from "@/components/admin/primitives";
+import { AdminPage, AdminHeader } from "@/components/admin/primitives";
 import { MonthSelector } from "@/components/admin/MonthSelector";
-import { StatsCard } from "@/components/ui/stats-card-1";
-import { formatarPreco } from "@/lib/utils/format";
 import {
-  FinanceiroBreakdown,
+  FinanceiroView,
   type DadosFinanceiro,
-} from "@/components/admin/financeiro/FinanceiroBreakdown";
-import {
-  ReceitaAreaChart,
-  FonteDonutChart,
-  RankingBarChart,
-} from "@/components/admin/Charts";
+} from "@/components/admin/financeiro/FinanceiroView";
 import {
   janelaMes,
   receitaPorFonte,
   atendimentoNoPeriodo,
   serieReceitaPorDia,
-  servicosMaisVendidos,
   novosClientes,
+  rankingServicos,
+  rankingProdutos,
+  ocupacaoPorHoraJanela,
+  ocupacaoPorDiaSemana,
+  recorrencia,
 } from "@/lib/admin/metrics";
 
 export const dynamic = "force-dynamic";
@@ -43,37 +39,51 @@ export default async function FinanceiroPage({
   const { desde, ate } = janelaMes(ano, mesIndex);
   const { desde: desdeAnt, ate: ateAnt } = janelaMes(ano, mesIndex - 1);
 
-  const [fonte, atend, serie, ranking, novos, fonteAnt, atendAnt, novosAnt] =
-    await Promise.all([
-      receitaPorFonte(desde, ate),
-      atendimentoNoPeriodo(desde, ate),
-      serieReceitaPorDia(desde, ate),
-      servicosMaisVendidos(6),
-      novosClientes(desde, ate),
-      receitaPorFonte(desdeAnt, ateAnt),
-      atendimentoNoPeriodo(desdeAnt, ateAnt),
-      novosClientes(desdeAnt, ateAnt),
-    ]);
+  const [
+    fonte,
+    atend,
+    serie,
+    novos,
+    rankServ,
+    rankProd,
+    horas,
+    dias,
+    recorr,
+    fonteAnt,
+    atendAnt,
+    novosAnt,
+  ] = await Promise.all([
+    receitaPorFonte(desde, ate),
+    atendimentoNoPeriodo(desde, ate),
+    serieReceitaPorDia(desde, ate),
+    novosClientes(desde, ate),
+    rankingServicos(desde, ate),
+    rankingProdutos(desde, ate),
+    ocupacaoPorHoraJanela(desde, ate),
+    ocupacaoPorDiaSemana(desde, ate),
+    recorrencia(desde, ate),
+    receitaPorFonte(desdeAnt, ateAnt),
+    atendimentoNoPeriodo(desdeAnt, ateAnt),
+    novosClientes(desdeAnt, ateAnt),
+  ]);
 
   const ticket = atend.concluidos ? fonte.servicos / atend.concluidos : 0;
   const ticketAnt = atendAnt.concluidos ? fonteAnt.servicos / atendAnt.concluidos : 0;
 
-  // % variação vs. mês anterior. Sem base anterior (=0): mostra +/-100% se há valor agora, senão 0%.
-  const variacao = (atual: number, anterior: number) => {
-    const pct = anterior === 0 ? (atual > 0 ? 100 : 0) : ((atual - anterior) / anterior) * 100;
-    const sinal = pct >= 0 ? "+" : "";
-    return {
-      change: `${sinal}${pct.toFixed(1)}%`,
-      changeType: (pct >= 0 ? "positive" : "negative") as "positive" | "negative",
-    };
+  // Delta vs. mês anterior, em %. null = sem dado relevante (some o rótulo).
+  const pctDelta = (atual: number, ant: number) => {
+    if (ant === 0 && atual === 0) return null;
+    const pct = ant === 0 ? 100 : Math.round(((atual - ant) / ant) * 100);
+    if (pct === 0) return { texto: "igual ao mês anterior", positivo: true };
+    const mais = pct > 0;
+    return { texto: `${Math.abs(pct)}% ${mais ? "a mais" : "a menos"} que mês anterior`, positivo: mais };
   };
-
-  const resumo = [
-    { title: "Faturamento", value: formatarPreco(fonte.total), icon: <Wallet className="h-4 w-4 text-muted-foreground" />, ...variacao(fonte.total, fonteAnt.total) },
-    { title: "Atendimentos", value: String(atend.concluidos), icon: <Users className="h-4 w-4 text-muted-foreground" />, ...variacao(atend.concluidos, atendAnt.concluidos) },
-    { title: "Ticket médio", value: formatarPreco(ticket), icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />, ...variacao(ticket, ticketAnt) },
-    { title: "Clientes novos", value: String(novos), icon: <UserPlus className="h-4 w-4 text-muted-foreground" />, ...variacao(novos, novosAnt) },
-  ];
+  const absDelta = (atual: number, ant: number, maisEhBom: boolean) => {
+    const d = atual - ant;
+    if (d === 0) return { texto: "igual ao mês anterior", positivo: true };
+    const mais = d > 0;
+    return { texto: `${Math.abs(d)} ${mais ? "a mais" : "a menos"} que mês anterior`, positivo: maisEhBom ? mais : !mais };
+  };
 
   const dados: DadosFinanceiro = {
     total: fonte.total,
@@ -85,45 +95,33 @@ export default async function FinanceiroPage({
     atendimentos: atend.concluidos,
     cancelados: atend.cancelados,
     novos,
+    deltas: {
+      total: pctDelta(fonte.total, fonteAnt.total) ?? undefined,
+      ticket: pctDelta(ticket, ticketAnt) ?? undefined,
+      cancelados: absDelta(atend.cancelados, atendAnt.cancelados, false),
+      novos: absDelta(novos, novosAnt, true),
+    },
   };
-
-  const fonteDados = [
-    { nome: "Serviços", valor: fonte.servicos },
-    { nome: "Loja", valor: fonte.loja },
-    { nome: "Assinaturas", valor: fonte.assinaturas },
-    { nome: "Mensalistas", valor: fonte.mensalistas },
-  ];
 
   return (
     <AdminPage>
       <AdminHeader
         titulo="Financeiro"
-        descricao="Receita por fonte no mês. Toque em cada card para ver os lançamentos."
+        descricao="Resumo do mês. Toque em Insights para análises detalhadas."
         acao={<MonthSelector atual={mesParam} />}
       />
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {resumo.map((s) => (
-          <StatsCard key={s.title} {...s} />
-        ))}
-      </div>
-
-      <FinanceiroBreakdown mes={mesParam} dados={dados} />
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <SectionCard titulo="Receita por fonte">
-          <FonteDonutChart dados={fonteDados} />
-        </SectionCard>
-        <SectionCard titulo="Mais vendidos">
-          <RankingBarChart dados={ranking} />
-        </SectionCard>
-      </div>
-
-      <div className="mt-4">
-        <SectionCard titulo="Curva de receita do mês">
-          <ReceitaAreaChart dados={serie} />
-        </SectionCard>
-      </div>
+      <FinanceiroView
+        mes={mesParam}
+        dados={dados}
+        serie={serie}
+        rankServicos={rankServ}
+        rankProdutos={rankProd}
+        horas={horas}
+        dias={dias}
+        ocupacao={atend.taxaOcupacao}
+        recorrencia={recorr}
+      />
     </AdminPage>
   );
 }

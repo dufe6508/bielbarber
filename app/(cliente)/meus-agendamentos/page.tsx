@@ -15,6 +15,7 @@ import {
   Clock,
   X,
   Scissors,
+  Award,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
@@ -182,6 +183,12 @@ export default function MeusAgendamentosPage() {
               {consulta.data.nome}
             </span>
           </p>
+
+          <Fidelidade
+            concluidos={
+              consulta.data.agendamentos.filter((a) => a.status === "concluido").length
+            }
+          />
 
           {consulta.data.agendamentos.length === 0 ? (
             <EstadoVazio
@@ -515,6 +522,44 @@ function Remarcar({
             "Confirmar novo horário"
           )}
         </button>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Selo de fidelidade ─────────────────────────────────────────────────────
+// Mostra quantos cortes o cliente já concluiu — reconhecimento leve, sem login
+// nem backend novo. A partir de 5 cortes, vira "cliente fiel".
+function Fidelidade({ concluidos }: { concluidos: number }) {
+  if (concluidos < 1) return null;
+  const fiel = concluidos >= 5;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={cn(
+        "mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3",
+        fiel
+          ? "border-primary/30 bg-primary/[0.04]"
+          : "border-border bg-card"
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-xl",
+          fiel ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+        )}
+      >
+        <Award className="size-5" />
+      </span>
+      <div className="leading-tight">
+        <p className="font-heading text-base font-semibold tracking-tight text-foreground">
+          {concluidos} {concluidos === 1 ? "corte concluído" : "cortes concluídos"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {fiel ? "Cliente fiel da casa. Valeu pela parceria!" : "Obrigado por voltar sempre."}
+        </p>
       </div>
     </motion.div>
   );

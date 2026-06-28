@@ -1,14 +1,50 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, MapPin } from "lucide-react";
+import { Check, MapPin, CalendarPlus } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
 import { formatarPreco, formatarData } from "@/lib/utils/format";
+
+const ENDERECO = "Av. Serrinha, 82 · Vale do Jatobá, BH · 30692-600";
 
 // "HH:00" → próxima hora "HH+1:00"
 function proximaHora(h: string): string {
   const hora = Number(h.split(":")[0]);
   return `${String(hora + 1).padStart(2, "0")}:00`;
+}
+
+// Gera e baixa um .ics (horário local flutuante). No celular, abre o app de
+// calendário nativo direto — sem dependência externa.
+function baixarICS(
+  data: string,
+  inicio: string,
+  fim: string,
+  titulo: string,
+  descricao: string
+) {
+  const [a, m, d] = data.split("-");
+  const dt = (hhmm: string) => `${a}${m}${d}T${hhmm.replace(":", "")}00`;
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Biel Barber Shop//PT-BR",
+    "BEGIN:VEVENT",
+    `UID:${a}${m}${d}-${inicio}@bielbarber`,
+    `DTSTART:${dt(inicio)}`,
+    `DTEND:${dt(fim)}`,
+    `SUMMARY:${titulo}`,
+    `DESCRIPTION:${descricao}`,
+    `LOCATION:${ENDERECO}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "agendamento-biel.ics";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 const rotuloPagamento: Record<string, string> = {
@@ -150,20 +186,38 @@ export function TicketConfirmacao() {
           {/* Rodapé */}
           <div className="flex items-center justify-center gap-1.5 border-t border-dashed border-border bg-muted/40 px-5 py-3">
             <MapPin className="size-3.5 text-muted-foreground" aria-hidden="true" />
-            <p className="text-xs text-muted-foreground">
-              Av. Serrinha, 82 · Vale do Jatobá, BH · 30692-600
-            </p>
+            <p className="text-xs text-muted-foreground">{ENDERECO}</p>
           </div>
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={reset}
-        className="w-full rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground transition-[transform,background-color] hover:bg-muted active:scale-[0.99]"
-      >
-        Fazer novo agendamento
-      </button>
+      <div className="space-y-2.5">
+        {data && horario && (
+          <button
+            type="button"
+            onClick={() =>
+              baixarICS(
+                data,
+                horario,
+                horarioFim ? proximaHora(horarioFim) : proximaHora(horario),
+                "Corte na Biel Barber Shop",
+                servicos.map((s) => s.nome).join(", ")
+              )
+            }
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-transform hover:opacity-90 active:scale-[0.99]"
+          >
+            <CalendarPlus className="size-4" aria-hidden="true" />
+            Adicionar à agenda
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={reset}
+          className="w-full rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground transition-[transform,background-color] hover:bg-muted active:scale-[0.99]"
+        >
+          Fazer novo agendamento
+        </button>
+      </div>
     </motion.div>
   );
 }

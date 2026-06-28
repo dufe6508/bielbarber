@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Loader2,
@@ -11,6 +11,8 @@ import {
   Star,
   Package,
   AlertTriangle,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminModal, Campo, inputCls } from "@/components/admin/AdminModal";
@@ -54,6 +56,31 @@ export function ProdutosManager() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...VAZIO });
   const [salvando, setSalvando] = useState(false);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function enviarFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-selecionar o mesmo arquivo
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem acima de 5 MB.");
+      return;
+    }
+    setEnviandoFoto(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/produtos/upload", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error);
+      setForm((f) => ({ ...f, urlImagem: j.url }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha no upload.");
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
 
   async function carregar() {
     setCarregando(true);
@@ -285,13 +312,60 @@ export function ProdutosManager() {
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
             />
           </Campo>
-          <Campo rotulo="URL da imagem">
+          <Campo rotulo="Foto do produto">
             <input
-              className={inputCls}
-              value={form.urlImagem}
-              onChange={(e) => setForm({ ...form, urlImagem: e.target.value })}
-              placeholder="https://…"
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              onChange={enviarFoto}
+              className="hidden"
             />
+            {form.urlImagem ? (
+              <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.urlImagem} alt="Prévia" className="size-full object-cover" />
+                {enviandoFoto && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                    <Loader2 className="size-5 animate-spin text-foreground" />
+                  </div>
+                )}
+                <div className="absolute right-2 top-2 flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="inline-flex size-8 items-center justify-center rounded-lg bg-card/90 text-foreground shadow-sm backdrop-blur hover:bg-card"
+                    aria-label="Trocar foto"
+                  >
+                    <ImagePlus className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, urlImagem: "" }))}
+                    className="inline-flex size-8 items-center justify-center rounded-lg bg-card/90 text-destructive shadow-sm backdrop-blur hover:bg-card"
+                    aria-label="Remover foto"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={enviandoFoto}
+                className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-60"
+              >
+                {enviandoFoto ? (
+                  <Loader2 className="size-6 animate-spin" />
+                ) : (
+                  <>
+                    <ImagePlus className="size-7" />
+                    <span className="text-sm font-medium">Escolher foto</span>
+                    <span className="text-xs text-muted-foreground/80">Galeria ou câmera · até 5 MB</span>
+                  </>
+                )}
+              </button>
+            )}
           </Campo>
           <div className="grid grid-cols-2 gap-4">
             <Campo rotulo="Preço (R$)">

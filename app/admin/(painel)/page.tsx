@@ -20,7 +20,7 @@ import {
 } from "@/components/admin/primitives";
 import { MonthSelector } from "@/components/admin/MonthSelector";
 import {
-  ReceitaAreaChart,
+  ReceitaBarChart,
   RankingBarChart,
   OcupacaoBarChart,
 } from "@/components/admin/Charts";
@@ -143,7 +143,7 @@ export default async function DashboardPage({
 
       <div className="mt-5">
         <SectionCard titulo="Receita no mês">
-          <ReceitaAreaChart dados={serie} />
+          <ReceitaBarChart dados={serie} />
         </SectionCard>
       </div>
 

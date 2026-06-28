@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { janelaMes } from "@/lib/admin/metrics";
+import { janelaMes, janelaData } from "@/lib/admin/metrics";
 
 type Item = { nome: string; sub?: string; valor?: number; qtd?: number };
 
@@ -26,6 +26,7 @@ export async function GET(request: Request) {
   const tipo = url.searchParams.get("tipo");
   const { ano, mesIndex } = parseMes(url.searchParams.get("mes"));
   const { desde, ate } = janelaMes(ano, mesIndex);
+  const jd = janelaData(desde); // janela UTC p/ filtrar Appointment.data (dia do corte)
 
   let titulo = "";
   let itens: Item[] = [];
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
     titulo = "Serviços realizados";
     const linhas = await prisma.appointmentService.findMany({
       where: {
-        agendamento: { status: "concluido", criadoEm: { gte: desde, lt: ate } },
+        agendamento: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
       },
       select: { precoNaHora: true, servico: { select: { nome: true } } },
     });
@@ -98,7 +99,7 @@ export async function GET(request: Request) {
   } else if (tipo === "cancelamentos") {
     titulo = "Cancelamentos";
     const linhas = await prisma.appointment.findMany({
-      where: { status: "cancelado", criadoEm: { gte: desde, lt: ate } },
+      where: { status: "cancelado", data: { gte: jd.desde, lt: jd.ate } },
       select: {
         data: true,
         horarioInicio: true,

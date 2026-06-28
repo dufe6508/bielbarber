@@ -25,6 +25,26 @@ function dec(v: { toString(): string } | null | undefined): number {
   return v ? parseFloat(v.toString()) : 0;
 }
 
+// O campo Appointment.data é `@db.Date` → Prisma entrega meia-noite UTC. Para
+// filtrar/agrupar por dia do corte sem off-by-one de timezone, derivamos uma
+// janela UTC do mês (a partir do `desde` local que carrega ano/mês) e lemos a
+// data com getters UTC. Mês corrente não conta dias futuros.
+export function janelaData(refLocal: Date): { desde: Date; ate: Date } {
+  const ano = refLocal.getFullYear();
+  const mes = refLocal.getMonth();
+  const desde = new Date(Date.UTC(ano, mes, 1));
+  const fimMes = new Date(Date.UTC(ano, mes + 1, 1));
+  const now = new Date();
+  const amanha = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  return { desde, ate: fimMes < amanha ? fimMes : amanha };
+}
+
+function chaveDiaUTC(d: Date): string {
+  const mes = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dia = String(d.getUTCDate()).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${mes}-${dia}`;
+}
+
 export type ResumoReceita = {
   servicos: number;
   loja: number;
@@ -74,9 +94,10 @@ export async function receitaPorFonte(
   desde: Date,
   ate: Date = new Date()
 ): Promise<ReceitaPorFonte> {
+  const jd = janelaData(desde);
   const [ags, pedidos, pacotes, subs] = await Promise.all([
     prisma.appointment.findMany({
-      where: { status: "concluido", criadoEm: { gte: desde, lt: ate } },
+      where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
       select: { valorTotal: true },
     }),
     prisma.order.findMany({
@@ -118,9 +139,10 @@ export async function atendimentoNoPeriodo(
   desde: Date,
   ate: Date = new Date()
 ): Promise<ResumoAtendimento> {
+  const jd = janelaData(desde);
   const ags = await prisma.appointment.groupBy({
     by: ["status"],
-    where: { criadoEm: { gte: desde, lt: ate } },
+    where: { data: { gte: jd.desde, lt: jd.ate } },
     _count: { _all: true },
   });
   const por = (s: string) =>
@@ -154,10 +176,11 @@ export async function serieReceitaPorDia(
   desde: Date,
   ate: Date
 ): Promise<{ data: string; servicos: number; loja: number }[]> {
+  const jd = janelaData(desde);
   const [ags, pedidos] = await Promise.all([
     prisma.appointment.findMany({
-      where: { status: "concluido", criadoEm: { gte: desde, lt: ate } },
-      select: { criadoEm: true, valorTotal: true },
+      where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
+      select: { data: true, valorTotal: true },
     }),
     prisma.order.findMany({
       where: { statusPagamento: "pago", criadoEm: { gte: desde, lt: ate } },
@@ -165,19 +188,20 @@ export async function serieReceitaPorDia(
     }),
   ]);
 
+  // Eixo do dia em UTC (alinha com Appointment.data @db.Date). Pedidos contam
+  // pelo dia UTC do criadoEm — alinhamento visual no mesmo eixo.
   const mapa = new Map<string, { servicos: number; loja: number }>();
-  const cursor = new Date(desde);
-  cursor.setHours(0, 0, 0, 0);
-  while (cursor < ate) {
-    mapa.set(chaveDia(cursor), { servicos: 0, loja: 0 });
-    cursor.setDate(cursor.getDate() + 1);
+  const cursor = new Date(jd.desde);
+  while (cursor < jd.ate) {
+    mapa.set(chaveDiaUTC(cursor), { servicos: 0, loja: 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   for (const a of ags) {
-    const e = mapa.get(chaveDia(a.criadoEm));
+    const e = mapa.get(chaveDiaUTC(a.data));
     if (e) e.servicos += dec(a.valorTotal);
   }
   for (const p of pedidos) {
-    const e = mapa.get(chaveDia(p.criadoEm));
+    const e = mapa.get(chaveDiaUTC(p.criadoEm));
     if (e) e.loja += dec(p.total);
   }
   return Array.from(mapa.entries()).map(([data, v]) => ({ data, ...v }));
@@ -300,4 +324,114 @@ export async function ocupacaoPorHora(): Promise<
   return Array.from(cont.entries())
     .map(([hora, total]) => ({ hora, total }))
     .sort((a, b) => a.hora.localeCompare(b.hora));
+}
+
+// ─── Insights (camada secundária do financeiro) ─────────────────────────────
+
+export type RankItem = { nome: string; qtd: number; receita: number };
+
+// Serviços por receita numa janela (concluídos).
+export async function rankingServicos(
+  desde: Date,
+  ate: Date,
+  limite = 8
+): Promise<RankItem[]> {
+  const jd = janelaData(desde);
+  const linhas = await prisma.appointmentService.findMany({
+    where: { agendamento: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } } },
+    select: { precoNaHora: true, servico: { select: { nome: true } } },
+  });
+  const m = new Map<string, { qtd: number; receita: number }>();
+  for (const l of linhas) {
+    const e = m.get(l.servico.nome) ?? { qtd: 0, receita: 0 };
+    e.qtd += 1;
+    e.receita += dec(l.precoNaHora);
+    m.set(l.servico.nome, e);
+  }
+  return Array.from(m.entries())
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.receita - a.receita)
+    .slice(0, limite);
+}
+
+// Produtos por receita numa janela (pedidos pagos).
+export async function rankingProdutos(
+  desde: Date,
+  ate: Date,
+  limite = 8
+): Promise<RankItem[]> {
+  const linhas = await prisma.orderItem.findMany({
+    where: { pedido: { statusPagamento: "pago", criadoEm: { gte: desde, lt: ate } } },
+    select: { quantidade: true, precoNaHora: true, produto: { select: { nome: true } } },
+  });
+  const m = new Map<string, { qtd: number; receita: number }>();
+  for (const l of linhas) {
+    const e = m.get(l.produto.nome) ?? { qtd: 0, receita: 0 };
+    e.qtd += l.quantidade;
+    e.receita += dec(l.precoNaHora) * l.quantidade;
+    m.set(l.produto.nome, e);
+  }
+  return Array.from(m.entries())
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.receita - a.receita)
+    .slice(0, limite);
+}
+
+// Ocupação por hora numa janela (concluídos).
+export async function ocupacaoPorHoraJanela(
+  desde: Date,
+  ate: Date
+): Promise<{ hora: string; total: number }[]> {
+  const jd = janelaData(desde);
+  const ags = await prisma.appointment.findMany({
+    where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
+    select: { horarioInicio: true },
+  });
+  const cont = new Map<string, number>();
+  for (const a of ags) cont.set(a.horarioInicio, (cont.get(a.horarioInicio) ?? 0) + 1);
+  return Array.from(cont.entries())
+    .map(([hora, total]) => ({ hora, total }))
+    .sort((a, b) => a.hora.localeCompare(b.hora));
+}
+
+const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+// Atendimentos por dia da semana numa janela (concluídos), usando a data do corte.
+export async function ocupacaoPorDiaSemana(
+  desde: Date,
+  ate: Date
+): Promise<{ dia: string; total: number }[]> {
+  const jd = janelaData(desde);
+  const ags = await prisma.appointment.findMany({
+    where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
+    select: { data: true },
+  });
+  const cont = new Array(7).fill(0);
+  for (const a of ags) cont[a.data.getUTCDay()]++;
+  // ordem seg..sáb (barbearia fecha dom/seg, mas mantemos todos pra contexto)
+  const ordem = [1, 2, 3, 4, 5, 6, 0];
+  return ordem.map((i) => ({ dia: DIAS[i], total: cont[i] }));
+}
+
+// Recorrência: dos clientes atendidos na janela, quantos têm >1 atendimento
+// concluído no histórico total. Retorna taxa (0..1).
+export async function recorrencia(
+  desde: Date,
+  ate: Date
+): Promise<{ recorrentes: number; total: number; taxa: number }> {
+  const jd = janelaData(desde);
+  const ags = await prisma.appointment.findMany({
+    where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
+    select: { clienteId: true },
+  });
+  const clientesJanela = Array.from(new Set(ags.map((a) => a.clienteId)));
+  if (!clientesJanela.length) return { recorrentes: 0, total: 0, taxa: 0 };
+  const cont = await prisma.appointment.groupBy({
+    by: ["clienteId"],
+    where: { status: "concluido", clienteId: { in: clientesJanela } },
+    _count: { _all: true },
+  });
+  const recorrentes = cont.filter((c) => c._count._all > 1).length;
+  const total = clientesJanela.length;
+  return { recorrentes, total, taxa: total ? recorrentes / total : 0 };
 }

@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import "./globals.css";
 
 const inter = Inter({
@@ -26,6 +27,19 @@ export const metadata: Metadata = {
   title: "Biel Barber Shop",
   description:
     "Agende seu corte no Biel Barber Shop — Av. Serrinha, 82 · Vale do Jatobá, BH",
+  appleWebApp: {
+    capable: true,
+    title: "Biel Barber Shop",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#141417",
 };
 
 export default function RootLayout({
@@ -42,6 +56,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col">
         <ThemeProvider>
           {children}
+          <InstallPrompt />
           <Toaster richColors position="top-center" />
         </ThemeProvider>
       </body>
