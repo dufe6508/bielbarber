@@ -1,3 +1,14 @@
+import { AdminPage, AdminHeader } from "@/components/admin/primitives";
+import { ProdutosManager } from "@/components/admin/produtos/ProdutosManager";
+
 export default function ProdutosAdminPage() {
-  return <main className="flex-1 p-6"><p>Produtos</p></main>;
+  return (
+    <AdminPage>
+      <AdminHeader
+        titulo="Loja"
+        descricao="Produtos, estoque, promoções e destaques. O que estiver ativo aparece na vitrine do cliente."
+      />
+      <ProdutosManager />
+    </AdminPage>
+  );
 }

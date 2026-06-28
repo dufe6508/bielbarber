@@ -30,7 +30,7 @@
   --color-input:               var(--input);
   --color-ring:                var(--ring);
 
-  /* Tokens customizados (mono-acento navy) */
+  /* Tokens customizados (mono-acento onyx) */
   --color-destaque:            var(--destaque);
   --color-destaque-foreground: var(--destaque-foreground);
   --color-dourado:             var(--dourado);
@@ -100,9 +100,9 @@
 }
 
 /* ─── Tema Claro ────────────────────────────────────────────────────────────
-   Paleta navy: branco + azul-marinho. Mono-acento (navy).
-   Referência: Oxford Blue #192338 · Space Cadet #1E2E4F · YInMn #31487A
-               Jordy Blue #8FB3E2 · Lavender #D9E1F1
+   Paleta onyx mono: branco/off-white + grafite quase-preto neutro.
+   Mono-acento (onyx). Sem cor saturada, sem 2ª cor.
+   Hue fixo ~258–265, chroma ≤0.006 — sem azul perceptível.
 
    SISTEMA DE ELEVAÇÃO (light):
    background  = cool-tinted near-white — chão do app

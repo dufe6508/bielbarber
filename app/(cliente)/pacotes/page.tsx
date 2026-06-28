@@ -33,16 +33,16 @@ export default function PacotesPage() {
   });
 
   const gridVariants: Variants = {
-    show: { transition: { staggerChildren: reduzir ? 0 : 0.06 } },
+    show: { transition: { staggerChildren: reduzir ? 0 : 0.05 } },
   };
   const cardVariants: Variants = reduzir
     ? { hidden: { opacity: 0 }, show: { opacity: 1 } }
     : {
-        hidden: { opacity: 0, y: 16 },
+        hidden: { opacity: 0, y: 14 },
         show: {
           opacity: 1,
           y: 0,
-          transition: { duration: 0.35, ease: [0.23, 1, 0.32, 1] },
+          transition: { duration: 0.3, ease: [0.23, 1, 0.32, 1] },
         },
       };
 
@@ -62,7 +62,18 @@ export default function PacotesPage() {
       {isLoading ? (
         <div className="mt-8 grid gap-5 md:grid-cols-2">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-72 animate-pulse rounded-2xl bg-muted" />
+            <div
+              key={i}
+              className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6"
+            >
+              <div className="h-5 w-24 animate-pulse rounded-full bg-muted" />
+              <div className="h-6 w-1/2 animate-pulse rounded bg-muted" />
+              <div className="mt-2 space-y-2 border-t border-dashed border-border pt-4">
+                <div className="h-3.5 w-3/4 animate-pulse rounded bg-muted" />
+                <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted" />
+              </div>
+              <div className="mt-auto h-8 w-1/3 animate-pulse rounded bg-muted" />
+            </div>
           ))}
         </div>
       ) : data && data.length > 0 ? (
@@ -85,10 +96,16 @@ export default function PacotesPage() {
               <motion.article
                 key={pkg.id}
                 variants={cardVariants}
-                whileHover={reduzir ? undefined : { y: -4 }}
-                transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                className="flex flex-col rounded-2xl border border-border bg-card p-6 transition-shadow hover:shadow-lg hover:shadow-primary/5"
+                whileHover={reduzir ? undefined : { y: -5 }}
+                whileTap={reduzir ? undefined : { scale: 0.99 }}
+                transition={{ type: "spring", stiffness: 320, damping: 26 }}
+                className="group/pkg relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm transition-[box-shadow,border-color] duration-300 hover:border-primary/25 hover:shadow-xl hover:shadow-primary/[0.06]"
               >
+                {/* Top accent — revela no hover */}
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 transition-opacity duration-300 group-hover/pkg:opacity-100"
+                />
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-primary">
@@ -140,7 +157,7 @@ export default function PacotesPage() {
                     onClick={() =>
                       toast.info("Fale com a barbearia para ativar o pacote.")
                     }
-                    className="inline-flex h-11 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+                    className="inline-flex h-11 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
                   >
                     Quero esse
                   </button>

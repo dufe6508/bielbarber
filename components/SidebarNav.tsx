@@ -6,6 +6,7 @@ import { MapPin, ChevronLeft, ChevronRight } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { navCliente, rotaAtiva } from "@/lib/nav";
 import { Logo } from "@/components/Logo";
+import { AdminSecretLogo } from "@/components/AdminSecretLogo";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
@@ -107,10 +108,7 @@ export function SidebarNav() {
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="relative z-10 flex h-[72px] shrink-0 items-center justify-between px-3">
-        <Link
-          href="/"
-          className="flex shrink-0 items-center gap-3 leading-none overflow-hidden"
-        >
+        <AdminSecretLogo className="flex shrink-0 items-center gap-3 leading-none overflow-hidden">
           {/* Logo — inline-flex garante rounded-full no box-shadow */}
           <span
             className="shrink-0 inline-flex rounded-full"
@@ -142,7 +140,7 @@ export function SidebarNav() {
               </motion.span>
             )}
           </AnimatePresence>
-        </Link>
+        </AdminSecretLogo>
 
         {/* Toggle — sempre visível, muda só o ícone */}
         <button

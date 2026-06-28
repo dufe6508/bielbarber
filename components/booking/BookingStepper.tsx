@@ -155,11 +155,16 @@ export function BookingStepper() {
           {PASSOS.map((_, i) => (
             <div
               key={i}
-              className={cn(
-                "h-1.5 flex-1 rounded-full transition-colors",
-                i <= passo ? "bg-primary" : "bg-muted"
-              )}
-            />
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+            >
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                initial={false}
+                animate={{ scaleX: i <= passo ? 1 : 0 }}
+                style={{ originX: 0 }}
+                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+              />
+            </div>
           ))}
         </div>
         <p className="mt-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
@@ -171,10 +176,10 @@ export function BookingStepper() {
         {/* ─── Desktop: stepper vertical ─── */}
         <div className="hidden md:block">
           <div className="sticky top-12">
-            <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
+            <h1 className="font-heading text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-foreground">
               Agendar
             </h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Rápido, sem cadastro.
             </p>
 
@@ -294,9 +299,15 @@ export function BookingStepper() {
         {temServicos && (
           <div className="mb-3 flex items-baseline justify-between">
             <span className="text-sm text-muted-foreground">Total</span>
-            <span className="font-mono text-lg font-bold tabular-nums text-foreground">
+            <motion.span
+              key={booking.valorTotal()}
+              initial={{ scale: 0.8, opacity: 0.5 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 22 }}
+              className="font-mono text-lg font-bold tabular-nums text-foreground"
+            >
               {formatarPreco(booking.valorTotal())}
-            </span>
+            </motion.span>
           </div>
         )}
         {barraAcao}

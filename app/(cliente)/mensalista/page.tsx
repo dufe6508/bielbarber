@@ -88,7 +88,7 @@ export default function MensalistaPage() {
         <button
           type="submit"
           disabled={!podeBuscar || busca.isPending}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busca.isPending ? (
             <Loader2 className="size-4 animate-spin" />
@@ -169,7 +169,9 @@ export default function MensalistaPage() {
                       hidden: { opacity: 0, y: 10 },
                       show: { opacity: 1, y: 0 },
                     }}
-                    className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4"
+                    whileHover={{ y: -2 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 26 }}
+                    className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-primary/[0.05]"
                   >
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                       <Scissors className="size-5" />
@@ -189,8 +191,8 @@ export default function MensalistaPage() {
                 ))}
               </motion.ul>
 
-              {/* Total + pagar */}
-              <div className="mt-6 rounded-2xl border border-border bg-card p-5">
+              {/* Total + pagar — peça focal, elevação maior */}
+              <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-md shadow-primary/[0.04]">
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">
                     Total do ciclo
@@ -209,7 +211,7 @@ export default function MensalistaPage() {
                 <button
                   type="button"
                   onClick={() => setPagar(true)}
-                  className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+                  className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
                 >
                   <Wallet className="size-4" />
                   Pagar mensalidade

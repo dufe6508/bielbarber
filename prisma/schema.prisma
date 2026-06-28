@@ -97,6 +97,10 @@ model Service {
   ativo          Boolean @default(true)
   // Quantos slots de 1h o serviço ocupa. Coloração = 2. Admin edita depois.
   slotsNecessarios Int   @default(1) @map("slots_necessarios")
+  // Quantos clientes o barbeiro aceita no mesmo horário para este serviço (1 = exclusivo).
+  capacidadePorSlot Int  @default(1) @map("capacidade_por_slot")
+  // Ordem de exibição no fluxo do cliente e no painel.
+  ordem            Int   @default(0)
 
   agendamentoServicos AppointmentService[]
   pacoteServicos      PackageService[]
@@ -143,7 +147,13 @@ model Product {
   precoAntigo       Decimal? @db.Decimal(10, 2) @map("preco_antigo")
   quantidadeEstoque Int      @default(0) @map("quantidade_estoque")
   urlImagem         String?  @map("url_imagem")
+  categoria         String?
+  // Selo curto exibido no card (ex.: "Novo", "Mais vendido").
+  badge             String?
+  // Produto em destaque na vitrine da loja.
+  destaque          Boolean  @default(false)
   ativo             Boolean  @default(true)
+  ordem             Int      @default(0)
 
   itensPedido    OrderItem[]
   pacoteProdutos PackageProduct[]
@@ -158,7 +168,13 @@ model Package {
   tipo         PackageType
   preco        Decimal     @db.Decimal(10, 2)
   validadeDias Int?        @map("validade_dias")
+  // Planos recorrentes (assinatura): quantos usos por mês e teto por semana.
+  quantidadeMensal Int?    @map("quantidade_mensal")
+  limiteSemanal    Int?    @map("limite_semanal")
+  renovavel        Boolean @default(false)
+  destaque         Boolean @default(false)
   ativo        Boolean     @default(true)
+  ordem        Int         @default(0)
 
   servicos       PackageService[]
   produtos       PackageProduct[]
@@ -270,6 +286,46 @@ model Payment {
   mensalista  Subscription? @relation(fields: [mensalistaId], references: [id])
 
   @@map("pagamentos")
+}
+
+// Agenda semanal — horas abertas por dia da semana (template recorrente).
+// O barbeiro edita no painel. Sem linha = usa o padrão (ter–sáb cheios, dom/seg vazios).
+// horarios = ["09:00","10:00",...] em ordem. Vazio = dia fechado.
+model WeeklySchedule {
+  diaSemana    Int      @id @map("dia_semana") // 0=dom ... 6=sáb
+  horarios     String[] @default([])
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("agenda_semanal")
+}
+
+// Exceção pontual à agenda semanal: feriado, folga, pausa, ou abertura extra
+// num dia específico. Tem prioridade sobre WeeklySchedule para aquela data.
+enum ScheduleExceptionType {
+  fechado // dia inteiro fechado (feriado/folga)
+  horarios // sobrescreve os horários abertos daquele dia
+}
+
+model ScheduleException {
+  id        String                @id @default(uuid())
+  data      DateTime              @unique @db.Date
+  tipo      ScheduleExceptionType
+  // Quando tipo = horarios: lista de "HH:00" abertos nesse dia. Vazio quando fechado.
+  horarios  String[]              @default([])
+  motivo    String?
+  criadoEm  DateTime              @default(now()) @map("criado_em")
+
+  @@map("agenda_excecoes")
+}
+
+// Configurações globais do painel (chave/valor). Ex.: horizonte de agendamento
+// (quantos dias à frente o cliente pode marcar).
+model Setting {
+  chave        String   @id
+  valor        String
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("configuracoes")
 }
 
 model NotificationLog {

@@ -6,6 +6,9 @@ import { navCliente, rotaAtiva } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 
+// Spring compartilhado — dá o "peso" físico ao movimento (pílula, ícone, rótulo)
+const spring = { type: "spring" as const, stiffness: 380, damping: 30, mass: 0.8 };
+
 export function BottomNav() {
   const pathname = usePathname();
 
@@ -13,14 +16,15 @@ export function BottomNav() {
     <nav
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 md:hidden",
-        "border-t border-border/40 bg-background/85 backdrop-blur-xl",
+        "border-t border-border/40 bg-background/80 backdrop-blur-2xl",
         "pb-[env(safe-area-inset-bottom)]"
       )}
       style={{
-        boxShadow: "0 -1px 0 oklch(0.872 0.003 258 / 0.5), 0 -8px 24px oklch(0.20 0.006 255 / 0.07)",
+        boxShadow:
+          "0 -1px 0 oklch(0.872 0.003 258 / 0.5), 0 -10px 30px oklch(0.20 0.006 255 / 0.08)",
       }}
     >
-      <div className="flex items-stretch">
+      <div className="flex items-stretch px-1">
         {navCliente.map((item) => {
           const Icone = item.icone;
           const ativo = rotaAtiva(pathname, item.href);
@@ -29,41 +33,70 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               aria-current={ativo ? "page" : undefined}
-              className={cn(
-                "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors",
-                ativo ? "text-primary" : "text-muted-foreground"
-              )}
+              className="group relative flex flex-1 flex-col items-center pt-2 pb-1.5 outline-none"
             >
-              {/* Top indicator bar */}
+              {/* Barra superior — desliza entre abas com spring */}
               {ativo && (
                 <motion.div
                   layoutId="bottom-nav-bar"
-                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-8 rounded-full bg-primary"
-                  style={{
-                    boxShadow: "0 0 8px oklch(0.232 0.006 265 / 0.6)",
-                  }}
-                  transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                  className="absolute top-0 left-1/2 h-[2.5px] w-9 -translate-x-1/2 rounded-full bg-primary"
+                  style={{ boxShadow: "0 0 10px oklch(0.232 0.006 265 / 0.7)" }}
+                  transition={spring}
                 />
               )}
 
-              {/* Icon pill */}
-              <span
-                className={cn(
-                  "flex h-7 w-12 items-center justify-center rounded-xl transition-all duration-200",
-                  ativo ? "bg-primary/10" : "group-hover:bg-muted"
-                )}
+              {/* Ícone + pílula — escala no toque (whileTap) */}
+              <motion.span
+                className="relative flex h-9 w-14 items-center justify-center"
+                whileTap={{ scale: 0.82 }}
+                transition={{ type: "spring", stiffness: 600, damping: 20 }}
               >
-                <Icone
-                  className={cn(
-                    "size-5 transition-transform duration-200",
-                    ativo && "drop-shadow-[0_0_6px_oklch(0.232_0.006_265/0.5)] scale-105"
-                  )}
-                  strokeWidth={ativo ? 2.5 : 2}
-                  aria-hidden="true"
-                />
-              </span>
+                {/* Pílula de fundo — desliza para a aba ativa */}
+                {ativo && (
+                  <motion.span
+                    layoutId="bottom-nav-pill"
+                    className="absolute inset-0 rounded-2xl bg-primary/10"
+                    transition={spring}
+                  />
+                )}
 
-              {item.rotulo}
+                {/* Pop do ícone ao ativar */}
+                <motion.span
+                  className="relative"
+                  animate={{
+                    scale: ativo ? 1.12 : 1,
+                    y: ativo ? -1 : 0,
+                  }}
+                  transition={spring}
+                >
+                  <Icone
+                    className={cn(
+                      "size-[22px] transition-colors duration-200",
+                      ativo
+                        ? "text-primary drop-shadow-[0_0_7px_oklch(0.232_0.006_265/0.5)]"
+                        : "text-muted-foreground group-active:text-foreground"
+                    )}
+                    strokeWidth={ativo ? 2.5 : 2}
+                    aria-hidden="true"
+                  />
+                </motion.span>
+              </motion.span>
+
+              {/* Rótulo — sobe e ganha peso quando ativo */}
+              <motion.span
+                className={cn(
+                  "text-[10px] font-medium leading-none tracking-tight",
+                  ativo ? "text-primary" : "text-muted-foreground"
+                )}
+                animate={{
+                  opacity: ativo ? 1 : 0.7,
+                  y: ativo ? -1 : 0,
+                  fontWeight: ativo ? 600 : 500,
+                }}
+                transition={spring}
+              >
+                {item.rotulo}
+              </motion.span>
             </Link>
           );
         })}

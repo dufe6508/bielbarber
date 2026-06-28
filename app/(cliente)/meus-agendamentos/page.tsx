@@ -155,7 +155,7 @@ export default function MeusAgendamentosPage() {
         <button
           type="submit"
           disabled={!podeBuscar || consulta.isFetching}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {consulta.isFetching ? (
             <Loader2 className="size-4 animate-spin" />
@@ -252,7 +252,9 @@ function CartaoAgendamento({
         hidden: { opacity: 0, y: 10 },
         show: { opacity: 1, y: 0 },
       }}
-      className="relative overflow-hidden rounded-2xl border border-border bg-card"
+      whileHover={{ y: -2 }}
+      transition={{ type: "spring", stiffness: 320, damping: 26 }}
+      className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-primary/[0.05]"
     >
       {/* Faixa lateral de status */}
       <span className={cn("absolute inset-y-0 left-0 w-1.5", v.faixa)} />

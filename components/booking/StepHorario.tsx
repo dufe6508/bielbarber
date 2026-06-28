@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  CalendarOff,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Moon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useBooking } from "@/lib/store/booking";
 import {
@@ -108,6 +115,39 @@ export function StepHorario() {
     }
   }
 
+  // Dias corridos entre hoje e uma data ISO (para saber se está na régua).
+  function diasAteHoje(iso: string): number {
+    const [a, m, d] = iso.split("-").map(Number);
+    const alvo = new Date(a, m - 1, d);
+    alvo.setHours(0, 0, 0, 0);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000);
+  }
+
+  // Seleção de data unificada (régua + calendário). Garante que o dia esteja
+  // na régua; a centralização fica a cargo do efeito abaixo.
+  function selecionarData(iso: string) {
+    setData(iso);
+    prefetchSlots(client, iso);
+    const diff = diasAteHoje(iso);
+    if (diff >= qtdDias) setQtdDias(diff + 3);
+  }
+
+  // Sempre que a data muda, centraliza o dia ativo na régua (inclusive quando
+  // veio do calendário completo). Só mexe na régua — sem setState.
+  useEffect(() => {
+    if (!data) return;
+    const alvo = stripRef.current?.querySelector<HTMLElement>(
+      `[data-iso="${data}"]`
+    );
+    alvo?.scrollIntoView({
+      behavior: reduzir ? "auto" : "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [data, qtdDias, reduzir]);
+
   const { data: slots, isLoading } = useQuery(slotsQueryOptions(data));
   const grupos = useMemo(() => (slots ? agruparPorPeriodo(slots) : []), [slots]);
 
@@ -197,7 +237,7 @@ export function StepHorario() {
         <div
           ref={stripRef}
           onScroll={aoRolar}
-          className="flex touch-pan-x gap-2.5 overflow-x-auto overscroll-x-contain px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex touch-pan-x snap-x snap-proximity gap-2.5 overflow-x-auto overscroll-x-contain px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {dias.map((d) => {
             const iso = dataISOLocal(d);
@@ -210,7 +250,8 @@ export function StepHorario() {
               <motion.button
                 key={iso}
                 type="button"
-                onClick={() => setData(iso)}
+                data-iso={iso}
+                onClick={() => selecionarData(iso)}
                 onMouseEnter={() => prefetchSlots(client, iso)}
                 onFocus={() => prefetchSlots(client, iso)}
                 aria-pressed={ativo}
@@ -218,7 +259,7 @@ export function StepHorario() {
                 whileTap={{ scale: 0.94 }}
                 transition={SPRING}
                 className={cn(
-                  "relative flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-3",
+                  "relative flex min-w-[68px] shrink-0 snap-center flex-col items-center gap-1 rounded-xl border px-3 py-3",
                   ativo
                     ? "border-primary text-primary-foreground"
                     : "border-border bg-card text-foreground shadow-xs hover:border-primary/40 hover:shadow-sm"
@@ -255,14 +296,32 @@ export function StepHorario() {
 
       {/* Aviso: serviço de coloração ocupa 2 horários seguidos */}
       {slotsNecessarios >= 2 && !diaFechado && (
-        <motion.p
+        <motion.div
           initial={reduzir ? false : { opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-lg border border-primary/25 bg-accent px-3.5 py-2.5 text-xs text-foreground"
+          className="flex items-start gap-3 rounded-xl border border-primary/20 bg-accent px-4 py-3"
         >
-          A coloração ocupa <strong>2 horários seguidos</strong>. Escolha o
-          horário de início — o seguinte é reservado junto.
-        </motion.p>
+          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Layers className="size-4" aria-hidden="true" />
+          </span>
+          <div className="space-y-0.5">
+            <p className="text-sm font-semibold text-foreground">
+              Serviço de 2 horários
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              A coloração ocupa{" "}
+              <strong className="font-medium text-foreground">
+                2 horários seguidos
+              </strong>
+              . Escolha o de início; o seguinte é reservado junto e marcado
+              com{" "}
+              <span className="inline-flex h-3.5 items-center rounded-full bg-foreground px-1 align-middle font-mono text-[9px] font-bold text-background">
+                2ª
+              </span>
+              .
+            </p>
+          </div>
+        </motion.div>
       )}
 
       {/* Horários */}
@@ -309,21 +368,23 @@ export function StepHorario() {
                             : "border-border bg-card text-foreground hover:border-primary/40"
                         )}
                       >
-                        <AnimatePresence>
-                          {ativo && (
-                            <motion.span
-                              initial={{ opacity: 0, scale: 0.9 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.9 }}
-                              transition={SPRING}
-                              className={cn(
-                                "absolute inset-0 rounded-lg shadow-sm",
-                                ehFim ? "bg-primary/85" : "bg-primary"
-                              )}
-                              aria-hidden="true"
-                            />
-                          )}
-                        </AnimatePresence>
+                        {/* Destaque que "voa" do horário antigo para o novo */}
+                        {ehInicio && (
+                          <motion.span
+                            layoutId="slot-ativo"
+                            transition={SPRING}
+                            className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {ehFim && (
+                          <motion.span
+                            layoutId="slot-ativo-fim"
+                            transition={SPRING}
+                            className="absolute inset-0 rounded-lg bg-primary/85 shadow-sm"
+                            aria-hidden="true"
+                          />
+                        )}
                         <span className="relative">{h}</span>
                         {ehFim && (
                           <span className="absolute -top-1.5 -right-1.5 z-10 flex h-4 items-center rounded-full bg-foreground px-1 text-[9px] font-bold text-background shadow-sm">
@@ -339,21 +400,37 @@ export function StepHorario() {
           </motion.div>
         </AnimatePresence>
       ) : (
-        <p className="rounded-xl border border-dashed border-border bg-muted/40 p-4 text-center text-sm text-muted-foreground">
-          {diaFechado
-            ? "Fechado neste dia. Escolha de terça a sábado."
-            : "Nenhum horário disponível neste dia. Tente outro."}
-        </p>
+        <motion.div
+          initial={reduzir ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="flex flex-col items-center gap-3.5 rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center"
+        >
+          <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground/70">
+            {diaFechado ? (
+              <Moon className="size-5" aria-hidden="true" />
+            ) : (
+              <CalendarOff className="size-5" aria-hidden="true" />
+            )}
+          </span>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-foreground">
+              {diaFechado ? "Fechado neste dia" : "Sem horários por aqui"}
+            </p>
+            <p className="max-w-[34ch] text-xs leading-relaxed text-muted-foreground">
+              {diaFechado
+                ? "Dia de folga do barbeiro. Escolha outro dia para agendar."
+                : "Este dia já está cheio ou ainda não foi aberto. Tente um dia diferente."}
+            </p>
+          </div>
+        </motion.div>
       )}
 
       <CalendarSheet
         open={agendaAberta}
         onClose={() => setAgendaAberta(false)}
         selected={data}
-        onSelect={(iso) => {
-          setData(iso);
-          prefetchSlots(client, iso);
-        }}
+        onSelect={(iso) => selecionarData(iso)}
       />
     </div>
   );
