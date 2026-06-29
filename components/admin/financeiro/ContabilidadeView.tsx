@@ -17,6 +17,14 @@ import {
   ChevronLeft,
   ArrowDownRight,
   ArrowUpRight,
+  Home,
+  Droplet,
+  Zap,
+  Wifi,
+  Package,
+  Users,
+  Wrench,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +52,20 @@ const CATEGORIAS: { id: Categoria; label: string }[] = [
   { id: "outros", label: "Outros" },
 ];
 const catLabel = (c: string) => CATEGORIAS.find((x) => x.id === c)?.label ?? c;
+
+const CAT_ICON: Record<Categoria, LucideIcon> = {
+  aluguel: Home,
+  agua: Droplet,
+  luz: Zap,
+  internet: Wifi,
+  produtos: Package,
+  funcionarios: Users,
+  impostos: Landmark,
+  manutencao: Wrench,
+  marketing: Megaphone,
+  outros: Receipt,
+};
+const catIcone = (c: string): LucideIcon => CAT_ICON[c as Categoria] ?? Receipt;
 
 type Resumo = {
   receitaBruta: number;
@@ -335,10 +357,11 @@ function Chip({ rotulo, valor, icone: Icone }: { rotulo: string; valor: string; 
 
 function DespesaBars({ despesas }: { despesas: Despesa[] }) {
   if (!despesas.length) return <p className="py-6 text-center text-sm text-muted-foreground">Sem despesas no mês.</p>;
-  const max = Math.max(...despesas.map((d) => d.valor));
+  const ordenadas = [...despesas].sort((a, b) => b.valor - a.valor);
+  const max = Math.max(...ordenadas.map((d) => d.valor));
   return (
     <ul className="space-y-2.5">
-      {despesas.map((d, i) => (
+      {ordenadas.map((d, i) => (
         <li key={d.id}>
           <div className="mb-1 flex items-baseline justify-between gap-2">
             <div className="min-w-0 flex-1">
@@ -516,35 +539,49 @@ function ListaDoMes({ despesas, onEditar, onMudou }: { despesas: Despesa[]; onEd
   }
 
   if (!despesas.length) return <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma despesa neste mês.</p>;
+  const ordenadas = [...despesas].sort((a, b) => b.valor - a.valor);
   return (
-    <ul className="space-y-1.5">
-      {despesas.map((d) => (
-        <li key={d.id} className="flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-background px-3 py-2.5">
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 truncate text-sm font-medium text-foreground">
-              {d.fixo && <Repeat className="size-3 shrink-0 text-muted-foreground" />}
-              {d.nome}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {catLabel(d.categoria)} · {d.data.slice(8)}/{d.data.slice(5, 7)}
-              {d.virtual && d.variavel
-                ? <span className="ml-1.5 text-amber-600 dark:text-amber-400">estimativa · confirmar</span>
-                : d.status === "pendente" && <span className="ml-1.5 text-amber-600 dark:text-amber-400">pendente</span>}
-            </p>
-          </div>
-          <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">{formatarPreco(d.valor)}</span>
-          <div className="flex shrink-0 items-center">
-            <button onClick={() => onEditar(d)} aria-label="Editar" className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Pencil className="size-3.5" />
-            </button>
-            {!d.virtual && (
-              <button onClick={() => remover(d)} aria-label="Excluir" className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                <Trash2 className="size-3.5" />
-              </button>
-            )}
-          </div>
-        </li>
-      ))}
+    <ul className="space-y-2">
+      {ordenadas.map((d) => {
+        const CatIcone = catIcone(d.categoria);
+        const aviso = d.virtual && d.variavel ? "estimativa" : d.status === "pendente" ? "pendente" : null;
+        return (
+          <li key={d.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-background p-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <CatIcone className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 truncate text-sm font-medium text-foreground">
+                {d.fixo && <Repeat className="size-3 shrink-0 text-muted-foreground" />}
+                {d.nome}
+              </p>
+              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <span>{catLabel(d.categoria)}</span>
+                <span className="text-muted-foreground/50">·</span>
+                <span className="font-mono">{d.data.slice(8)}/{d.data.slice(5, 7)}</span>
+                {aviso && (
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                    {aviso}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{formatarPreco(d.valor)}</span>
+              <div className="flex items-center gap-0.5">
+                <button onClick={() => onEditar(d)} aria-label="Editar" className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <Pencil className="size-3.5" />
+                </button>
+                {!d.virtual && (
+                  <button onClick={() => remover(d)} aria-label="Excluir" className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -564,35 +601,47 @@ function ListaFixas({ moldes, onEditar, onMudou }: { moldes: Molde[]; onEditar: 
 
   if (!moldes.length)
     return <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma despesa fixa. Crie uma marcando &quot;recorrente&quot;.</p>;
+  const ordenados = [...moldes].sort((a, b) => num(b.valor) - num(a.valor));
   return (
-    <ul className="space-y-1.5">
-      {moldes.map((m) => (
-        <li key={m.id} className={cn("flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-background px-3 py-2.5", !m.ativo && "opacity-50")}>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">{m.nome}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {catLabel(m.categoria)}
-              {m.variavel ? " · variável" : " · fixo"}
-              {m.diaVencimento ? ` · dia ${m.diaVencimento}` : ""}
-              {!m.ativo ? " · inativa" : ""}
-            </p>
-          </div>
-          <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">
-            {m.variavel ? "~" : ""}{formatarPreco(num(m.valor))}
-          </span>
-          <div className="flex shrink-0 items-center">
-            <button onClick={() => onEditar(m)} aria-label="Editar" className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Pencil className="size-3.5" />
-            </button>
-            <button onClick={() => toggle(m)} aria-label={m.ativo ? "Desativar" : "Ativar"} className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Power className="size-3.5" />
-            </button>
-            <button onClick={() => remover(m)} aria-label="Excluir" className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-        </li>
-      ))}
+    <ul className="space-y-2">
+      {ordenados.map((m) => {
+        const CatIcone = catIcone(m.categoria);
+        return (
+          <li key={m.id} className={cn("flex items-center gap-3 rounded-xl border border-border/60 bg-background p-3", !m.ativo && "opacity-50")}>
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <CatIcone className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-foreground">{m.nome}</p>
+              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <span>{catLabel(m.categoria)}</span>
+                <span className="text-muted-foreground/50">·</span>
+                <span>{m.variavel ? "variável" : "fixo"}</span>
+                {m.diaVencimento ? <><span className="text-muted-foreground/50">·</span><span>dia {m.diaVencimento}</span></> : null}
+                {!m.ativo && (
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">inativa</span>
+                )}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                {m.variavel ? "~" : ""}{formatarPreco(num(m.valor))}
+              </span>
+              <div className="flex items-center gap-0.5">
+                <button onClick={() => onEditar(m)} aria-label="Editar" className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <Pencil className="size-3.5" />
+                </button>
+                <button onClick={() => toggle(m)} aria-label={m.ativo ? "Desativar" : "Ativar"} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <Power className="size-3.5" />
+                </button>
+                <button onClick={() => remover(m)} aria-label="Excluir" className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

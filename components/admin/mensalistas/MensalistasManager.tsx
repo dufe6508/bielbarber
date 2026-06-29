@@ -117,10 +117,10 @@ export function MensalistasManager() {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">
-          <Pill tom="verde">Dia 10: {ativos.filter((m) => m.diaCobranca === 10).length}</Pill>
-          <Pill tom="azul">Dia 30: {ativos.filter((m) => m.diaCobranca === 30).length}</Pill>
+          <GrupoChip dia={10} qtd={ativos.filter((m) => m.diaCobranca === 10).length} />
+          <GrupoChip dia={30} qtd={ativos.filter((m) => m.diaCobranca === 30).length} />
         </div>
         <button
           onClick={() => setModal(true)}
@@ -150,60 +150,63 @@ export function MensalistasManager() {
               <motion.li
                 key={m.id}
                 layout
-                className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs"
+                className="rounded-2xl border border-border bg-card p-4 shadow-xs"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-heading text-base font-semibold text-foreground">
-                      {m.nome}
-                    </h3>
-                    <Pill tom={e.tom}>
-                      <Icone className="size-3" /> {e.rotulo}
-                    </Pill>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <Phone className="size-3" /> {formatarTelefone(m.telefone)}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarClock className="size-3" /> Fecha dia {m.diaCobranca}
-                    </span>
-                    {m.proximaCobranca && (
-                      <span>Próx.: {formatarData(m.proximaCobranca)}</span>
-                    )}
-                  </div>
+                {/* Topo: nome + status */}
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="min-w-0 truncate font-heading text-base font-semibold text-foreground">
+                    {m.nome}
+                  </h3>
+                  <Pill tom={e.tom}>
+                    <Icone className="size-3" /> {e.rotulo}
+                  </Pill>
                 </div>
 
-                <div className="text-right">
-                  <p className="font-mono text-lg font-semibold tabular-nums text-foreground">
-                    {formatarPreco(m.totalCiclo)}
-                  </p>
-                  <p className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <Scissors className="size-3" />
-                    {m.atendimentosCiclo} no ciclo
-                  </p>
+                {/* Metadados */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Phone className="size-3 shrink-0" /> {formatarTelefone(m.telefone)}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarClock className="size-3 shrink-0" /> Fecha dia {m.diaCobranca}
+                  </span>
+                  {m.proximaCobranca && (
+                    <span className="text-muted-foreground/80">Próx. {formatarData(m.proximaCobranca)}</span>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => marcarPago(m)}
-                    disabled={m.totalCiclo === 0}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
-                      m.totalCiclo === 0
-                        ? "cursor-not-allowed text-muted-foreground/50"
-                        : "bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400"
-                    )}
-                  >
-                    <CheckCircle2 className="size-3.5" /> Pago
-                  </button>
-                  <button
-                    onClick={() => desativar(m)}
-                    className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
-                    aria-label="Remover"
-                  >
-                    <UserMinus className="size-3.5" />
-                  </button>
+                {/* Rodapé: valor + ações */}
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xl font-semibold tabular-nums leading-none text-foreground">
+                      {formatarPreco(m.totalCiclo)}
+                    </p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <Scissors className="size-3 shrink-0" />
+                      {m.atendimentosCiclo} {m.atendimentosCiclo === 1 ? "corte" : "cortes"} no ciclo
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      onClick={() => marcarPago(m)}
+                      disabled={m.totalCiclo === 0}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
+                        m.totalCiclo === 0
+                          ? "cursor-not-allowed bg-muted/50 text-muted-foreground/50"
+                          : "bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400"
+                      )}
+                    >
+                      <CheckCircle2 className="size-3.5" /> Pago
+                    </button>
+                    <button
+                      onClick={() => desativar(m)}
+                      className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+                      aria-label="Remover"
+                    >
+                      <UserMinus className="size-4" />
+                    </button>
+                  </div>
                 </div>
               </motion.li>
             );
@@ -263,5 +266,16 @@ export function MensalistasManager() {
         </div>
       </AdminModal>
     </div>
+  );
+}
+
+// Chip neutro de grupo de fechamento — harmonizado com a paleta onyx.
+function GrupoChip({ dia, qtd }: { dia: number; qtd: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-xs">
+      <CalendarClock className="size-3.5 shrink-0" />
+      Dia {dia}
+      <span className="font-mono font-semibold tabular-nums text-foreground">{qtd}</span>
+    </span>
   );
 }

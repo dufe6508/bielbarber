@@ -16,7 +16,6 @@ import {
   Gauge,
   Loader2,
   ChevronRight,
-  Download,
   type LucideIcon,
 } from "lucide-react";
 import { ReceitaBarChart, MiniBarChart } from "@/components/admin/Charts";
@@ -131,17 +130,10 @@ export function FinanceiroView(props: FinanceiroViewProps) {
     }
   }
 
-  // Intervalo do mês (YYYY-MM) → ?de=…&ate=… para a exportação CSV.
-  const [ano, mesNum] = props.mes.split("-").map(Number);
-  const de = `${props.mes}-01`;
-  const ultimoDia = new Date(ano, mesNum, 0).getDate();
-  const ate = `${props.mes}-${String(ultimoDia).padStart(2, "0")}`;
-  const exportHref = `/api/admin/financeiro/export?de=${de}&ate=${ate}`;
-
   return (
     <div>
-      {/* Segmented control + exportar */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      {/* Segmented control */}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
       <div className="relative inline-flex rounded-full border border-border bg-muted/50 p-1">
         {TABS.map((t) => {
           const ativo = tab === t.id;
@@ -166,15 +158,6 @@ export function FinanceiroView(props: FinanceiroViewProps) {
           );
         })}
       </div>
-
-        <a
-          href={exportHref}
-          download
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground shadow-xs transition-all hover:border-primary/40 hover:text-foreground active:scale-95"
-        >
-          <Download className="size-4" />
-          Exportar CSV
-        </a>
       </div>
 
       <AnimatePresence mode="wait">
@@ -323,8 +306,8 @@ function ResumoTab({
               {h.hint && (
                 <p
                   className={cn(
-                    "mt-0.5 text-[11px]",
-                    h.destaque ? "text-primary-foreground/75" : "text-muted-foreground"
+                    "mt-0.5 text-[11px] font-medium",
+                    h.destaque ? "text-primary-foreground/85" : "text-muted-foreground"
                   )}
                 >
                   {h.hint}
@@ -333,11 +316,11 @@ function ResumoTab({
               {h.delta && (
                 <p
                   className={cn(
-                    "mt-1 text-[11px] font-medium",
+                    "mt-1 text-[11px] font-semibold",
                     h.destaque
                       ? h.delta.positivo
                         ? "text-emerald-300 dark:text-emerald-700"
-                        : "text-primary-foreground/70 dark:text-foreground/50"
+                        : "text-rose-300 dark:text-rose-700"
                       : h.delta.positivo
                         ? "text-emerald-600 dark:text-emerald-400"
                         : "text-destructive"
