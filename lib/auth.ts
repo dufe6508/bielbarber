@@ -20,7 +20,13 @@ export const ADMIN_COOKIE = "bb_admin";
 export const ADMIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 dias
 
 function segredo(): string {
-  return process.env.ADMIN_SESSION_SECRET || "dev-inseguro-troque-em-producao";
+  const s = process.env.ADMIN_SESSION_SECRET;
+  if (s) return s;
+  // Em produção falha fechado: sem segredo, qualquer um forjaria o cookie de sessão.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("ADMIN_SESSION_SECRET não definida em produção.");
+  }
+  return "dev-inseguro-troque-em-producao";
 }
 
 function assinar(payload: string): string {
@@ -45,7 +51,11 @@ export function tokenValido(token: string | undefined | null): boolean {
   if (i < 0) return false;
   const payload = token.slice(0, i);
   const assinatura = token.slice(i + 1);
-  return comparaConstante(assinatura, assinar(payload));
+  if (!comparaConstante(assinatura, assinar(payload))) return false;
+  // Expira no servidor junto com o cookie — token roubado não vale pra sempre.
+  const emitidoEm = Number(payload.split(".")[1]);
+  if (!Number.isFinite(emitidoEm)) return false;
+  return Date.now() - emitidoEm < ADMIN_COOKIE_MAX_AGE * 1000;
 }
 
 export async function verificarSenha(senha: unknown): Promise<boolean> {

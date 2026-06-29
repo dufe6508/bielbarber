@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 //   2) marca cobranças vencidas e dispara lembretes escalonados
 function autorizado(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // sem secret configurado (dev) — libera
+  // Sem secret só libera fora de produção; em prod falha fechado pra não expor o endpoint.
+  if (!secret) return process.env.NODE_ENV !== "production";
   const auth = request.headers.get("authorization");
   return auth === `Bearer ${secret}`;
 }

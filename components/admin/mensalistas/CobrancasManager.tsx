@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
-  Loader2,
   CheckCircle2,
   Clock,
   AlertTriangle,
