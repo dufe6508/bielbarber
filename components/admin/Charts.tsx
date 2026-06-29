@@ -124,7 +124,7 @@ export function ReceitaBarChart({ dados }: { dados: DiaReceita[] }) {
           width={46}
           tickCount={4}
         />
-        <Tooltip content={<TooltipDia />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
+        <Tooltip content={<TooltipDia />} cursor={false} />
         <Bar dataKey="total" name="Total" radius={[4, 4, 0, 0]} maxBarSize={16}>
           {linhas.map((d, i) => (
             <Cell key={i} fill={COR} fillOpacity={d.total === max ? 1 : 0.5} />
@@ -168,7 +168,7 @@ export function FluxoCaixaChart({
           width={46}
           tickCount={4}
         />
-        <Tooltip content={<TooltipBox moeda />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
+        <Tooltip content={<TooltipBox moeda />} cursor={false} />
         <Bar dataKey="entradas" name="Entradas" fill={COR} radius={[3, 3, 0, 0]} maxBarSize={12} />
         <Bar dataKey="saidas" name="Saídas" fill="oklch(0.52 0.17 26)" radius={[3, 3, 0, 0]} maxBarSize={12} />
       </BarChart>
@@ -205,7 +205,7 @@ export function RankingBarChart({
           axisLine={false}
           width={110}
         />
-        <Tooltip content={<TooltipBox />} cursor={{ fill: "var(--muted)" }} />
+        <Tooltip content={<TooltipBox />} cursor={false} />
         <Bar dataKey="total" name="Vendas" radius={[0, 6, 6, 0]}>
           {dados.map((_, i) => (
             <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />
@@ -245,7 +245,7 @@ export function OcupacaoBarChart({
           axisLine={false}
           width={32}
         />
-        <Tooltip content={<TooltipBox />} cursor={{ fill: "var(--muted)" }} />
+        <Tooltip content={<TooltipBox />} cursor={false} />
         <Bar dataKey="total" name="Atend." fill={COR} radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
@@ -277,7 +277,7 @@ export function MiniBarChart({
           interval={0}
         />
         <YAxis hide allowDecimals={false} />
-        <Tooltip content={<TooltipBox />} cursor={{ fill: "var(--muted)" }} />
+        <Tooltip content={<TooltipBox />} cursor={false} />
         <Bar dataKey="total" name="Atend." radius={[5, 5, 0, 0]}>
           {dados.map((d, i) => (
             <Cell key={i} fill={COR} fillOpacity={d.total === max ? 1 : 0.32} />

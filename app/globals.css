@@ -309,12 +309,14 @@
   }
 }
 
-/* Previne seleção de texto e tap-highlight em gráficos no mobile */
+/* Previne seleção de texto, tap-highlight e focus ring em gráficos no mobile */
 .recharts-wrapper,
+.recharts-wrapper *,
 .recharts-surface {
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  outline: none !important;
 }
 
 /* Respeita preferência de movimento reduzido */
