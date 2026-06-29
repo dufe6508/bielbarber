@@ -85,6 +85,80 @@ export async function criarPreferencia(
   }
 }
 
+// ─── Checkout transparente (Payment Brick) ──────────────────────────────────
+// Cria o pagamento direto pela API a partir do formData do Brick. O valor é
+// SEMPRE o do servidor (input.valor) — nunca confiamos no que vem do cliente.
+export type PagamentoInput = {
+  chargeId: string;
+  valor: number;
+  descricao?: string;
+  // formData do Payment Brick: token, payment_method_id, issuer_id, installments, payer.
+  formData: Record<string, unknown>;
+};
+
+export type PixData = {
+  qrCode: string;
+  qrCodeBase64: string;
+  ticketUrl: string | null;
+};
+
+export type PagamentoCriado = {
+  id: string;
+  status: string | null;
+  statusDetail: string | null;
+  metodo: string | null;
+  pix: PixData | null;
+};
+
+export async function criarPagamento(
+  input: PagamentoInput
+): Promise<PagamentoCriado | null> {
+  if (!mpConfigurado()) return null;
+
+  const fd = input.formData;
+  const { Payment } = await import("mercadopago");
+  const pagamento = new Payment(await client());
+
+  const body: Record<string, unknown> = {
+    transaction_amount: input.valor, // autoritativo (servidor)
+    description: input.descricao ?? "Mensalidade — Biel Barber",
+    payment_method_id: fd.payment_method_id,
+    external_reference: input.chargeId,
+    notification_url: `${baseUrl()}/api/pagamentos/mercadopago/webhook`,
+    payer: fd.payer,
+  };
+  if (fd.token) body.token = fd.token;
+  if (fd.installments) body.installments = Number(fd.installments);
+  if (fd.issuer_id) body.issuer_id = fd.issuer_id;
+
+  // Idempotência: cartão usa o token (único por tentativa); pix usa o chargeId
+  // (evita gerar 2 QRs para a mesma cobrança).
+  const idempotencyKey = `${input.chargeId}:${fd.token ?? fd.payment_method_id}`;
+
+  const res = await pagamento.create({
+    body,
+    requestOptions: { idempotencyKey },
+  });
+
+  const poi = (
+    res as { point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }
+  ).point_of_interaction?.transaction_data;
+
+  return {
+    id: String(res.id),
+    status: res.status ?? null,
+    statusDetail: res.status_detail ?? null,
+    metodo: res.payment_type_id ?? res.payment_method_id ?? null,
+    pix: poi?.qr_code
+      ? {
+          qrCode: poi.qr_code,
+          qrCodeBase64: poi.qr_code_base64 ?? "",
+          ticketUrl: poi.ticket_url ?? null,
+        }
+      : null,
+  };
+}
+
 export type PagamentoMP = {
   status: string | null; // approved | pending | rejected | cancelled | refunded ...
   metodo: string | null; // pix | credit_card | debit_card | ...

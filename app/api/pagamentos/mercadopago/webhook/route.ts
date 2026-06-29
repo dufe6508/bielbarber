@@ -1,10 +1,39 @@
 import { NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { consultarPagamento, mapStatusMP, mapMetodoMP } from "@/lib/mercadopago";
 import { confirmarPagamento } from "@/lib/billing/charges";
 import type { ChargeMethod } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
+
+// Valida a assinatura HMAC do webhook (header x-signature). Retorna true se o
+// segredo não estiver configurado — mantém o fluxo de teste/manual funcionando
+// antes de ligar a credencial definitiva do barbeiro (mesmo desacoplamento do
+// mpConfigurado()). Manifest conforme docs do MP: id;request-id;ts.
+function assinaturaValida(request: Request, dataId: string): boolean {
+  const secret = process.env.MP_WEBHOOK_SECRET;
+  if (!secret) return true; // ainda não ligado — não bloqueia
+
+  const xSignature = request.headers.get("x-signature");
+  const xRequestId = request.headers.get("x-request-id");
+  if (!xSignature) return false;
+
+  const parts = Object.fromEntries(
+    xSignature.split(",").map((p) => p.split("=").map((s) => s.trim()) as [string, string])
+  );
+  const ts = parts.ts;
+  const v1 = parts.v1;
+  if (!ts || !v1) return false;
+
+  // MP exige data.id em minúsculas quando alfanumérico.
+  const manifest = `id:${dataId.toLowerCase()};request-id:${xRequestId};ts:${ts};`;
+  const esperado = createHmac("sha256", secret).update(manifest).digest("hex");
+
+  const a = Buffer.from(esperado, "hex");
+  const b = Buffer.from(v1, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 // POST — webhook do Mercado Pago. Recebe a notificação de pagamento, consulta o
 // status real na API (fonte da verdade) e atualiza a cobrança correspondente.
@@ -24,6 +53,11 @@ export async function POST(request: Request) {
     (body as { data?: { id?: string } })?.data?.id ??
     searchParams.get("data.id") ??
     searchParams.get("id");
+
+  // Rejeita notificações forjadas antes de qualquer consulta/escrita.
+  if (paymentId && !assinaturaValida(request, String(paymentId))) {
+    return NextResponse.json({ error: "assinatura inválida" }, { status: 401 });
+  }
 
   // Só tratamos eventos de pagamento.
   if (tipo !== "payment" || !paymentId) {

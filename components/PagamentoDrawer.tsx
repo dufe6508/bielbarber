@@ -1,17 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { AnimatePresence, motion } from "motion/react";
-import { QrCode, CreditCard, Check, Copy, Loader2, ArrowLeft, CalendarClock } from "lucide-react";
+import { Check, Copy, Loader2, CalendarClock, Clock3, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { formatarPreco, formatarData } from "@/lib/utils/format";
-import { cn } from "@/lib/utils";
+import type { ResultadoPagamento } from "@/components/MpPaymentBrick";
 
-type Etapa = "escolha" | "pix" | "cartao" | "processando" | "sucesso";
+// O Brick depende de `window` — carrega só no cliente.
+const MpPaymentBrick = dynamic(
+  () => import("@/components/MpPaymentBrick").then((m) => m.MpPaymentBrick),
+  { ssr: false }
+);
 
-const CODIGO_PIX_EXEMPLO =
-  "00020126360014BR.GOV.BCB.PIX0114+5531988887777520400005303986540";
+type Etapa = "form" | "pix" | "sucesso" | "pendente";
+type Pix = { qrCode: string; qrCodeBase64: string; ticketUrl: string | null };
 
 export function PagamentoDrawer({
   open,
@@ -27,59 +32,37 @@ export function PagamentoDrawer({
   onOpenChange: (v: boolean) => void;
   total: number;
   onPago?: () => void;
-  // Quando vinculado a uma cobrança de mensalidade — habilita checkout MP real.
   chargeId?: string;
   vencimento?: string | null;
   descricao?: string | null;
   barbearia?: string;
 }) {
-  const [etapa, setEtapa] = useState<Etapa>("escolha");
-  const [iniciando, setIniciando] = useState(false);
+  const [etapa, setEtapa] = useState<Etapa>("form");
+  const [pix, setPix] = useState<Pix | null>(null);
 
-  // Reseta a etapa ao fechar (próxima abertura começa em "escolha")
   function handleOpenChange(v: boolean) {
     onOpenChange(v);
     if (!v) {
-      setEtapa("escolha");
-      setIniciando(false);
+      setEtapa("form");
+      setPix(null);
     }
   }
 
-  // Tenta o checkout real do Mercado Pago. Se a credencial não estiver
-  // configurada (ou a cobrança não for informada), cai no fluxo manual `metodo`.
-  async function escolher(metodo: "pix" | "cartao") {
-    if (!chargeId) {
-      setEtapa(metodo);
+  function handleResult(r: ResultadoPagamento) {
+    if (r.tipo === "pix") {
+      setPix({ qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, ticketUrl: r.ticketUrl });
+      setEtapa("pix");
       return;
     }
-    setIniciando(true);
-    try {
-      const res = await fetch("/api/pagamentos/mercadopago/criar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chargeId }),
-      });
-      const dados = await res.json().catch(() => null);
-      if (dados?.configurado && dados.initPoint) {
-        window.location.href = dados.initPoint as string; // checkout MP
-        return;
-      }
-      // Sem gateway ativo → instrução de pagamento manual.
-      setEtapa(metodo);
-    } catch {
-      setEtapa(metodo);
-    } finally {
-      setIniciando(false);
-    }
-  }
-
-  function processar() {
-    setEtapa("processando");
-    setTimeout(() => setEtapa("sucesso"), 1400);
-    setTimeout(() => {
-      handleOpenChange(false);
+    if (r.tipo === "aprovado") {
+      setEtapa("sucesso");
       onPago?.();
-    }, 3000);
+      setTimeout(() => handleOpenChange(false), 2600);
+      return;
+    }
+    // pendente (em análise)
+    setEtapa("pendente");
+    onPago?.();
   }
 
   return (
@@ -93,14 +76,13 @@ export function PagamentoDrawer({
             <Drawer.Title className="sr-only">Pagamento</Drawer.Title>
 
             <AnimatePresence mode="wait">
-              {etapa === "escolha" && (
-                <Passo key="escolha">
+              {etapa === "form" && (
+                <Passo key="form">
                   <CabecalhoValor
                     total={total}
                     legenda={chargeId ? `Mensalidade · ${barbearia}` : "Total a pagar"}
                   />
-                  {/* Resumo da cobrança */}
-                  {chargeId && (vencimento || descricao) && (
+                  {(vencimento || descricao) && (
                     <div className="mt-4 space-y-1.5 rounded-xl border border-border bg-card p-3.5 text-sm">
                       {descricao && (
                         <div className="flex items-center justify-between gap-3">
@@ -120,49 +102,40 @@ export function PagamentoDrawer({
                       )}
                     </div>
                   )}
-                  <p className="mb-4 mt-6 text-sm font-medium text-foreground">
-                    Como você quer pagar?
-                  </p>
-                  <div className="space-y-3">
-                    {iniciando ? (
-                      <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" /> Abrindo pagamento…
-                      </div>
+
+                  <div className="mt-6">
+                    {chargeId ? (
+                      <MpPaymentBrick
+                        amount={total}
+                        chargeId={chargeId}
+                        onResult={handleResult}
+                        onErro={(msg) => msg && toast.error(msg)}
+                      />
                     ) : (
-                      <>
-                        <OpcaoPagamento
-                          icone={QrCode}
-                          titulo="Pix"
-                          descricao="Aprovação na hora"
-                          onClick={() => escolher("pix")}
-                        />
-                        <OpcaoPagamento
-                          icone={CreditCard}
-                          titulo="Cartão"
-                          descricao="Crédito ou débito"
-                          onClick={() => escolher("cartao")}
-                        />
-                      </>
+                      <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                        Cobrança não encontrada.
+                      </p>
                     )}
                   </div>
                 </Passo>
               )}
 
-              {etapa === "pix" && (
+              {etapa === "pix" && pix && (
                 <Passo key="pix">
-                  <Voltar onClick={() => setEtapa("escolha")} />
                   <CabecalhoValor total={total} legenda="Pague via Pix" />
                   <div className="mt-6 flex flex-col items-center">
-                    <div className="flex size-44 items-center justify-center rounded-2xl border border-border bg-card">
-                      <QrCode className="size-24 text-foreground" strokeWidth={1} />
-                    </div>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      QR de exemplo. O gateway real entra na próxima fase.
-                    </p>
+                    {pix.qrCodeBase64 ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`data:image/png;base64,${pix.qrCodeBase64}`}
+                        alt="QR Code Pix"
+                        className="size-52 rounded-2xl border border-border bg-white p-2"
+                      />
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard?.writeText(CODIGO_PIX_EXEMPLO);
+                        navigator.clipboard?.writeText(pix.qrCode);
                         toast.success("Código Pix copiado");
                       }}
                       className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
@@ -170,49 +143,52 @@ export function PagamentoDrawer({
                       <Copy className="size-4" />
                       Copiar código Pix
                     </button>
+                    {pix.ticketUrl && (
+                      <a
+                        href={pix.ticketUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                      >
+                        Abrir no app do banco <ExternalLink className="size-3" />
+                      </a>
+                    )}
+                    <p className="mt-4 text-center text-xs text-muted-foreground">
+                      Assim que o pagamento cair, a mensalidade é baixada
+                      automaticamente.
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={processar}
+                    onClick={() => handleOpenChange(false)}
                     className="mt-7 h-12 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
                   >
-                    Já fiz o pagamento
+                    Já paguei
                   </button>
                 </Passo>
               )}
 
-              {etapa === "cartao" && (
-                <Passo key="cartao">
-                  <Voltar onClick={() => setEtapa("escolha")} />
-                  <CabecalhoValor total={total} legenda="Pague com cartão" />
-                  <div className="mt-6 space-y-3">
-                    <CampoFake rotulo="Número do cartão" valor="0000 0000 0000 0000" />
-                    <div className="grid grid-cols-2 gap-3">
-                      <CampoFake rotulo="Validade" valor="MM/AA" />
-                      <CampoFake rotulo="CVV" valor="000" />
+              {etapa === "pendente" && (
+                <Passo key="pendente">
+                  <div className="flex flex-col items-center gap-4 py-14 text-center">
+                    <span className="flex size-16 items-center justify-center rounded-full bg-amber-500/12 text-amber-600 dark:text-amber-400">
+                      <Clock3 className="size-8" />
+                    </span>
+                    <div>
+                      <p className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                        Pagamento em análise
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Você será avisado assim que for confirmado.
+                      </p>
                     </div>
-                    <CampoFake rotulo="Nome no cartão" valor="Como está no cartão" />
-                  </div>
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Formulário de exemplo. O gateway real (Mercado Pago) entra na próxima fase.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={processar}
-                    className="mt-6 h-12 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
-                  >
-                    Pagar {formatarPreco(total)}
-                  </button>
-                </Passo>
-              )}
-
-              {etapa === "processando" && (
-                <Passo key="processando">
-                  <div className="flex flex-col items-center gap-4 py-16">
-                    <Loader2 className="size-10 animate-spin text-primary" />
-                    <p className="text-sm font-medium text-foreground">
-                      Processando pagamento...
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChange(false)}
+                      className="mt-2 h-11 rounded-xl border border-border bg-card px-6 text-sm font-medium text-foreground"
+                    >
+                      Fechar
+                    </button>
                   </div>
                 </Passo>
               )}
@@ -272,59 +248,5 @@ function CabecalhoValor({ total, legenda }: { total: number; legenda: string }) 
         {formatarPreco(total)}
       </p>
     </div>
-  );
-}
-
-function OpcaoPagamento({
-  icone: Icone,
-  titulo,
-  descricao,
-  onClick,
-}: {
-  icone: React.ElementType;
-  titulo: string;
-  descricao: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-[transform,border-color] hover:border-primary/40 active:scale-[0.99]"
-    >
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
-        <Icone className="size-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-medium text-foreground">{titulo}</span>
-        <span className="block text-xs text-muted-foreground">{descricao}</span>
-      </span>
-    </button>
-  );
-}
-
-function CampoFake({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div className="space-y-1.5">
-      <span className="text-xs font-medium text-muted-foreground">{rotulo}</span>
-      <div className="flex h-11 items-center rounded-lg border border-input bg-muted/40 px-3 font-mono text-sm text-muted-foreground/70">
-        {valor}
-      </div>
-    </div>
-  );
-}
-
-function Voltar({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-      )}
-    >
-      <ArrowLeft className="size-4" />
-      Voltar
-    </button>
   );
 }

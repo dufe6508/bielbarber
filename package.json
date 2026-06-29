@@ -15,6 +15,7 @@
     "@hookform/resolvers": "^5.4.0",
     "@maskito/kit": "^5.3.1",
     "@maskito/react": "^5.3.1",
+    "@mercadopago/sdk-react": "^1.0.7",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@supabase/ssr": "^0.12.0",
