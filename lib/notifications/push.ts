@@ -16,7 +16,18 @@ function configurar(): boolean {
   return true;
 }
 
-type Payload = { title: string; body: string; url: string };
+type PushAction = { action: string; title: string };
+type Payload = {
+  title: string;
+  body: string;
+  url: string;
+  // Agrupa notificações do mesmo assunto (uma substitui a outra em vez de empilhar).
+  tag?: string;
+  // Botões de ação na notificação (ex.: "Pagar agora").
+  actions?: PushAction[];
+  // Mantém a notificação visível até o usuário interagir (cobranças importantes).
+  requireInteraction?: boolean;
+};
 
 // Traduz um evento na notificação visível (título, corpo, deep link de destino).
 function montarPayload(event: NotificationEvent): Payload {
@@ -59,25 +70,37 @@ function montarPayload(event: NotificationEvent): Payload {
       };
     case "cobranca_emitida":
       return {
-        title: "Mensalidade disponível para pagamento",
-        body: `Sua mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")} já pode ser paga. Toque para pagar.`,
+        title: "💈 Mensalidade disponível",
+        body: `Sua mensalidade de ${reais(event.valor)} já pode ser paga. Toque em Pagar agora.`,
         url: "/mensalista",
+        tag: "cobranca-mensalidade",
+        actions: [{ action: "pagar", title: "Pagar agora" }],
+        requireInteraction: true,
       };
     case "cobranca_lembrete":
       return {
-        title: event.vencido ? "Mensalidade vencida" : "Lembrete de mensalidade",
+        title: event.vencido ? "⚠️ Mensalidade vencida" : "🔔 Lembrete de mensalidade",
         body: event.vencido
-          ? `Sua mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")} está vencida. Pague para regularizar.`
-          : `Não esqueça: mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")} aguardando pagamento.`,
+          ? `Sua mensalidade de ${reais(event.valor)} está vencida. Pague para voltar a agendar.`
+          : `Não esqueça: mensalidade de ${reais(event.valor)} aguardando pagamento.`,
         url: "/mensalista",
+        tag: "cobranca-mensalidade",
+        actions: [{ action: "pagar", title: "Pagar agora" }],
+        requireInteraction: true,
       };
     case "cobranca_confirmada":
       return {
-        title: "Pagamento confirmado",
-        body: `Recebemos sua mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")}. Obrigado!`,
+        title: "✅ Pagamento confirmado",
+        body: `Recebemos sua mensalidade de ${reais(event.valor)}. Obrigado! Já pode agendar de novo.`,
         url: "/mensalista",
+        tag: "cobranca-mensalidade",
       };
   }
+}
+
+// R$ no padrão BR (1.234,50).
+function reais(v: number): string {
+  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // Envia push para todas as assinaturas ativas do cliente, respeitando a

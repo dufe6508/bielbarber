@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, ArrowRight, Check, Loader2, MessageCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, MessageCircle, Wallet } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useBooking } from "@/lib/store/booking";
 import { ativarPush } from "@/lib/notifications/subscribe-client";
@@ -29,6 +30,7 @@ export function BookingStepper() {
   const [enviando, setEnviando] = useState(false);
   const [codigo, setCodigo] = useState<string | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
+  const [cobrancaPendente, setCobrancaPendente] = useState(false);
   const { preselecionar } = booking;
 
   // Deep link: /?servico=<slug|id> → pré-seleciona o serviço e pula pro horário.
@@ -122,6 +124,11 @@ export function BookingStepper() {
           setBloqueado(true);
           return;
         }
+        // Mensalidade pendente → tela pedindo o pagamento
+        if (res.status === 403 && dados.cobrancaPendente) {
+          setCobrancaPendente(true);
+          return;
+        }
         toast.error(dados.error ?? "Não foi possível agendar. Tente de novo.");
         return;
       }
@@ -168,6 +175,45 @@ export function BookingStepper() {
             <MessageCircle className="size-4" />
             Falar no WhatsApp
           </a>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Mensalidade pendente — pede o pagamento antes de liberar novo agendamento
+  if (cobrancaPendente) {
+    return (
+      <div className="mx-auto w-full max-w-md px-5 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+          className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-8 text-center dark:border-amber-400/25"
+        >
+          <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <Wallet className="size-7" />
+          </span>
+          <h1 className="mt-5 font-heading text-2xl font-semibold tracking-tight text-foreground">
+            Mensalidade pendente
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Você tem uma mensalidade em aberto. Quite o pagamento para liberar
+            novos agendamentos.
+          </p>
+          <Link
+            href="/mensalista"
+            className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-[transform,filter] hover:brightness-[1.10] active:scale-[0.98]"
+          >
+            <Wallet className="size-4" />
+            Pagar mensalidade
+          </Link>
+          <button
+            type="button"
+            onClick={() => setCobrancaPendente(false)}
+            className="mt-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Voltar
+          </button>
         </motion.div>
       </div>
     );

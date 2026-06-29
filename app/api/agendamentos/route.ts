@@ -117,6 +117,16 @@ export async function POST(request: Request) {
         throw new Error("BLOQUEADO");
       }
 
+      // Cobrança em aberto (pendente/vencido) trava novos agendamentos:
+      // o cliente precisa quitar a mensalidade antes de marcar de novo.
+      const cobrancaAberta = await tx.subscriptionCharge.findFirst({
+        where: { clienteId: cliente.id, status: { in: ["pendente", "vencido"] } },
+        select: { id: true },
+      });
+      if (cobrancaAberta) {
+        throw new Error("COBRANCA_PENDENTE");
+      }
+
       // Mensalista: só aceita se o cliente tiver assinatura ativa
       if (ehMensalista) {
         if (!cliente.mensalidade || cliente.mensalidade.status !== "ativo") {
@@ -164,6 +174,16 @@ export async function POST(request: Request) {
         {
           error: "Não foi possível concluir o agendamento. Fale com a barbearia.",
           bloqueado: true,
+        },
+        { status: 403 }
+      );
+    }
+    if (msg === "COBRANCA_PENDENTE") {
+      return NextResponse.json(
+        {
+          error:
+            "Você tem uma mensalidade pendente. Pague para liberar novos agendamentos.",
+          cobrancaPendente: true,
         },
         { status: 403 }
       );

@@ -29,7 +29,13 @@ export async function GET(_request: Request, { params }: Ctx) {
       podePagarLocal: true,
       criadoEm: true,
       mensalidade: {
-        select: { status: true, diaCobranca: true, totalCicloAtual: true },
+        select: { id: true, status: true, diaCobranca: true, totalCicloAtual: true },
+      },
+      cobrancas: {
+        where: { status: { in: ["pendente", "vencido"] } },
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+        select: { id: true, valor: true, status: true, vencimento: true, descricao: true },
       },
       pacotesCliente: {
         where: { status: "ativo" },
@@ -87,9 +93,19 @@ export async function GET(_request: Request, { params }: Ctx) {
     criadoEm: c.criadoEm.toISOString(),
     mensalidade: c.mensalidade
       ? {
+          id: c.mensalidade.id,
           status: c.mensalidade.status,
           diaCobranca: c.mensalidade.diaCobranca,
           totalCicloAtual: dec(c.mensalidade.totalCicloAtual),
+        }
+      : null,
+    cobrancaAberta: c.cobrancas[0]
+      ? {
+          id: c.cobrancas[0].id,
+          valor: dec(c.cobrancas[0].valor),
+          status: c.cobrancas[0].status,
+          vencimento: c.cobrancas[0].vencimento.toISOString().slice(0, 10),
+          descricao: c.cobrancas[0].descricao,
         }
       : null,
     assinaturas: c.pacotesCliente.map((p) => ({

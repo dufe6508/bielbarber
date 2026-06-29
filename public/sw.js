@@ -6,7 +6,7 @@ self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim(
 self.addEventListener("fetch", () => {});
 
 // ─── Push ───────────────────────────────────────────────────────────────────
-// Payload enviado pelo servidor: { title, body, url }
+// Payload do servidor: { title, body, url, tag?, actions?, requireInteraction? }
 self.addEventListener("push", (event) => {
   let dados = {};
   try {
@@ -20,15 +20,24 @@ self.addEventListener("push", (event) => {
       body: dados.body || "",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
+      tag: dados.tag || undefined,
+      renotify: Boolean(dados.tag),
+      requireInteraction: Boolean(dados.requireInteraction),
+      vibrate: [60, 40, 60],
+      actions: Array.isArray(dados.actions) ? dados.actions.slice(0, 2) : [],
       data: { url: dados.url || "/" },
     })
   );
 });
 
-// Toque na notificação → foca uma aba existente ou abre a URL de destino.
+// Toque na notificação (ou num botão de ação) → abre/foca a URL de destino.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const destino = (event.notification.data && event.notification.data.url) || "/";
+  // A ação "pagar" sempre leva à área de mensalidade; senão usa a url do payload.
+  const destino =
+    event.action === "pagar"
+      ? "/mensalista"
+      : (event.notification.data && event.notification.data.url) || "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => {
       for (const aba of abas) {

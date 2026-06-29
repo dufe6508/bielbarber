@@ -42,7 +42,14 @@ type Perfil = {
   observacoes: string | null;
   podePagarLocal: boolean;
   criadoEm: string;
-  mensalidade: { status: string; diaCobranca: number; totalCicloAtual: number } | null;
+  mensalidade: { id: string; status: string; diaCobranca: number; totalCicloAtual: number } | null;
+  cobrancaAberta: {
+    id: string;
+    valor: number;
+    status: "pendente" | "vencido";
+    vencimento: string;
+    descricao: string | null;
+  } | null;
   assinaturas: { nome: string; usosRestantes: number | null; expiraEm: string | null }[];
   stats: {
     totalCortes: number;
@@ -211,6 +218,16 @@ function Conteudo({
           ) : !p.mensalidade ? (
             <p className="text-xs text-muted-foreground">Sem assinaturas ou mensalidade.</p>
           ) : null}
+
+          {/* Cobrança e emissão (apenas mensalistas) */}
+          {p.mensalidade?.status === "ativo" && (
+            <CobrancaBox
+              mensalidadeId={p.mensalidade.id}
+              aberta={p.cobrancaAberta}
+              totalCiclo={p.mensalidade.totalCicloAtual}
+              onMudou={refetch}
+            />
+          )}
         </div>
       </CollapsibleCard>
 
@@ -274,6 +291,116 @@ function Linha({ rotulo, valor, forte }: { rotulo: string; valor: string; forte?
       >
         {valor}
       </span>
+    </div>
+  );
+}
+
+function CobrancaBox({
+  mensalidadeId,
+  aberta,
+  totalCiclo,
+  onMudou,
+}: {
+  mensalidadeId: string;
+  aberta: Perfil["cobrancaAberta"];
+  totalCiclo: number;
+  onMudou: () => void;
+}) {
+  const [emitindo, setEmitindo] = useState(false);
+  const [pagando, setPagando] = useState(false);
+
+  async function emitir() {
+    setEmitindo(true);
+    try {
+      const res = await fetch(`/api/admin/mensalistas/${mensalidadeId}/cobrancas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(d?.error ?? "Não foi possível emitir.");
+        return;
+      }
+      toast.success("Cobrança emitida e enviada ao cliente.");
+      onMudou();
+    } catch {
+      toast.error("Erro ao emitir cobrança.");
+    } finally {
+      setEmitindo(false);
+    }
+  }
+
+  async function marcarPago() {
+    if (!aberta) return;
+    setPagando(true);
+    try {
+      const res = await fetch(`/api/admin/cobrancas/${aberta.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "marcar_pago", metodo: "dinheiro" }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Pagamento confirmado.");
+      onMudou();
+    } catch {
+      toast.error("Não foi possível confirmar.");
+    } finally {
+      setPagando(false);
+    }
+  }
+
+  return (
+    <div className="mt-1 border-t border-border/60 pt-3">
+      {aberta ? (
+        <div
+          className={cn(
+            "rounded-xl border p-3",
+            aberta.status === "vencido"
+              ? "border-amber-500/40 bg-amber-500/[0.06]"
+              : "border-border bg-muted/30"
+          )}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+              {aberta.status === "vencido" ? (
+                <Ban className="size-3.5 text-amber-600 dark:text-amber-400" />
+              ) : (
+                <CalendarClock className="size-3.5 text-muted-foreground" />
+              )}
+              Cobrança {aberta.status === "vencido" ? "vencida" : "pendente"}
+            </span>
+            <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+              {formatarPreco(aberta.valor)}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Vence {dataBR(aberta.vencimento)}
+          </p>
+          <button
+            onClick={marcarPago}
+            disabled={pagando}
+            className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500/12 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:opacity-60 dark:text-emerald-400"
+          >
+            {pagando ? <Loader2 className="size-3.5 animate-spin" /> : <Wallet className="size-3.5" />}
+            Marcar como pago
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={emitir}
+          disabled={emitindo || totalCiclo <= 0}
+          className={cn(
+            "inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] disabled:opacity-50",
+            totalCiclo <= 0
+              ? "cursor-not-allowed bg-muted/50 text-muted-foreground"
+              : "bg-primary text-primary-foreground hover:opacity-90"
+          )}
+        >
+          {emitindo ? <Loader2 className="size-3.5 animate-spin" /> : <Wallet className="size-3.5" />}
+          {totalCiclo <= 0 ? "Nada a cobrar no ciclo" : "Emitir cobrança"}
+        </button>
+      )}
     </div>
   );
 }
