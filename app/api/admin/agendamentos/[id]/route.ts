@@ -35,15 +35,26 @@ export async function PATCH(request: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Nada para atualizar" }, { status: 400 });
   }
 
+  // Estado anterior — base para detectar transições (carimbo, cancelamento,
+  // remarcação) e decidir quais notificações disparar ao cliente.
+  const antes = await prisma.appointment.findUnique({
+    where: { id },
+    select: { status: true, data: true, horarioInicio: true },
+  });
+
   // Fidelidade: só carimba na TRANSIÇÃO para "concluido" (evita carimbar de novo
   // se o admin reabrir/salvar o mesmo agendamento já concluído).
-  const carimbar =
-    data.status === "concluido"
-      ? (await prisma.appointment.findUnique({
-          where: { id },
-          select: { status: true },
-        }))?.status !== "concluido"
-      : false;
+  const carimbar = data.status === "concluido" && antes?.status !== "concluido";
+
+  // Admin cancelou (transição p/ cancelado) → avisar o cliente.
+  const cancelou = data.status === "cancelado" && antes?.status !== "cancelado";
+  // Admin remarcou (mudou data ou horário) sem cancelar → avisar o cliente.
+  const remarcou =
+    !cancelou &&
+    ((data.data instanceof Date &&
+      data.data.getTime() !== antes?.data.getTime()) ||
+      (typeof data.horarioInicio === "string" &&
+        data.horarioInicio !== antes?.horarioInicio));
 
   const ag = await prisma.appointment.update({
     where: { id },
@@ -69,6 +80,13 @@ export async function PATCH(request: Request, { params }: Ctx) {
       carimbos: completou ? meta : novo,
       faltam: completou ? 0 : meta - novo,
     });
+  }
+
+  // porCliente:false → notifica só o cliente (admin não alerta a si mesmo).
+  if (cancelou) {
+    void notify({ type: "agendamento_cancelado", appointmentId: id, porCliente: false });
+  } else if (remarcou) {
+    void notify({ type: "agendamento_remarcado", appointmentId: id });
   }
 
   return NextResponse.json(ag);
