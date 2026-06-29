@@ -42,6 +42,24 @@ enum SubscriptionStatus {
   inativo
 }
 
+// Ciclo de vida de uma cobrança de mensalidade.
+enum ChargeStatus {
+  pendente // gerada, aguardando pagamento
+  pago // confirmado (MP ou manual)
+  vencido // passou do vencimento sem pagar
+  cancelado // anulada pelo barbeiro
+  expirado // preferência MP expirou sem pagamento
+}
+
+// Como o pagamento foi feito (espelha métodos do Mercado Pago + manual).
+enum ChargeMethod {
+  pix
+  cartao_credito
+  cartao_debito
+  dinheiro
+  outro
+}
+
 enum OrderPickupStatus {
   pendente
   pronto
@@ -91,6 +109,7 @@ model Client {
   pedidos                Order[]
   pacotesCliente         ClientPackage[]
   mensalidade            Subscription?
+  cobrancas              SubscriptionCharge[]
   notificacoes           NotificationLog[]
   pushSubscriptions      PushSubscription[]
   preferenciaNotificacao NotificationPreference?
@@ -257,10 +276,49 @@ model Subscription {
   proximaCobranca      DateTime?          @map("proxima_cobranca")
   criadoEm             DateTime           @default(now()) @map("criado_em")
 
-  cliente    Client    @relation(fields: [clienteId], references: [id])
+  cliente    Client               @relation(fields: [clienteId], references: [id])
   pagamentos Payment[]
+  cobrancas  SubscriptionCharge[]
 
   @@map("mensalistas")
+}
+
+// Cobrança de mensalidade — peça central do sistema de cobrança automática.
+// Cada fechamento de ciclo (auto pelo cron, ou manual pelo barbeiro) gera uma
+// linha aqui com ciclo de vida próprio. Os campos `mp*` ficam prontos para a
+// integração Mercado Pago sem exigir mudança de schema depois.
+model SubscriptionCharge {
+  id           String       @id @default(uuid())
+  mensalistaId String       @map("mensalista_id")
+  clienteId    String       @map("cliente_id")
+  valor        Decimal      @db.Decimal(10, 2)
+  status       ChargeStatus @default(pendente)
+  vencimento   DateTime     @db.Date
+  descricao    String? // resumo legível ("3 cortes no ciclo")
+  // Snapshot dos atendimentos cobrados: [{ id, data, servicos, valor }].
+  // Permite quitar os agendamentos certos na confirmação e mostrar o extrato.
+  itens        Json?
+  emitidaManual Boolean     @default(false) @map("emitida_manual")
+
+  // ─── Mercado Pago (preenchidos quando a credencial existir) ───────────────
+  mpPreferenceId String? @map("mp_preference_id")
+  mpPaymentId    String? @map("mp_payment_id")
+  mpInitPoint    String? @map("mp_init_point") // URL do checkout
+  metodo         ChargeMethod?
+  comprovanteUrl String? @map("comprovante_url")
+
+  pagoEm        DateTime? @map("pago_em")
+  ultimoLembrete DateTime? @map("ultimo_lembrete")
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+
+  mensalista Subscription @relation(fields: [mensalistaId], references: [id], onDelete: Cascade)
+  cliente    Client       @relation(fields: [clienteId], references: [id])
+
+  @@index([clienteId, status])
+  @@index([mensalistaId, status])
+  @@index([status, vencimento])
+  @@map("cobrancas_mensalidade")
 }
 
 model Order {

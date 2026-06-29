@@ -50,6 +50,11 @@ export async function PATCH(request: Request, { params }: Ctx) {
           proximaCobranca: proximaCobranca(sub.diaCobranca),
         },
       }),
+      // Fecha cobranças abertas deste mensalista para não ficarem órfãs.
+      prisma.subscriptionCharge.updateMany({
+        where: { mensalistaId: id, status: { in: ["pendente", "vencido"] } },
+        data: { status: "pago", pagoEm: new Date(), metodo: "dinheiro" },
+      }),
     ]);
     return NextResponse.json({ ok: true, total });
   }

@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { Drawer } from "vaul";
 import { AnimatePresence, motion } from "motion/react";
-import { QrCode, CreditCard, Check, Copy, Loader2, ArrowLeft } from "lucide-react";
+import { QrCode, CreditCard, Check, Copy, Loader2, ArrowLeft, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
-import { formatarPreco } from "@/lib/utils/format";
+import { formatarPreco, formatarData } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
 type Etapa = "escolha" | "pix" | "cartao" | "processando" | "sucesso";
@@ -18,18 +18,59 @@ export function PagamentoDrawer({
   onOpenChange,
   total,
   onPago,
+  chargeId,
+  vencimento,
+  descricao,
+  barbearia = "Biel Barber",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   total: number;
   onPago?: () => void;
+  // Quando vinculado a uma cobrança de mensalidade — habilita checkout MP real.
+  chargeId?: string;
+  vencimento?: string | null;
+  descricao?: string | null;
+  barbearia?: string;
 }) {
   const [etapa, setEtapa] = useState<Etapa>("escolha");
+  const [iniciando, setIniciando] = useState(false);
 
   // Reseta a etapa ao fechar (próxima abertura começa em "escolha")
   function handleOpenChange(v: boolean) {
     onOpenChange(v);
-    if (!v) setEtapa("escolha");
+    if (!v) {
+      setEtapa("escolha");
+      setIniciando(false);
+    }
+  }
+
+  // Tenta o checkout real do Mercado Pago. Se a credencial não estiver
+  // configurada (ou a cobrança não for informada), cai no fluxo manual `metodo`.
+  async function escolher(metodo: "pix" | "cartao") {
+    if (!chargeId) {
+      setEtapa(metodo);
+      return;
+    }
+    setIniciando(true);
+    try {
+      const res = await fetch("/api/pagamentos/mercadopago/criar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargeId }),
+      });
+      const dados = await res.json().catch(() => null);
+      if (dados?.configurado && dados.initPoint) {
+        window.location.href = dados.initPoint as string; // checkout MP
+        return;
+      }
+      // Sem gateway ativo → instrução de pagamento manual.
+      setEtapa(metodo);
+    } catch {
+      setEtapa(metodo);
+    } finally {
+      setIniciando(false);
+    }
   }
 
   function processar() {
@@ -54,23 +95,55 @@ export function PagamentoDrawer({
             <AnimatePresence mode="wait">
               {etapa === "escolha" && (
                 <Passo key="escolha">
-                  <CabecalhoValor total={total} legenda="Total a pagar" />
+                  <CabecalhoValor
+                    total={total}
+                    legenda={chargeId ? `Mensalidade · ${barbearia}` : "Total a pagar"}
+                  />
+                  {/* Resumo da cobrança */}
+                  {chargeId && (vencimento || descricao) && (
+                    <div className="mt-4 space-y-1.5 rounded-xl border border-border bg-card p-3.5 text-sm">
+                      {descricao && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Referente a</span>
+                          <span className="font-medium text-foreground">{descricao}</span>
+                        </div>
+                      )}
+                      {vencimento && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                            <CalendarClock className="size-3.5" /> Vencimento
+                          </span>
+                          <span className="font-mono tabular-nums text-foreground">
+                            {formatarData(vencimento)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <p className="mb-4 mt-6 text-sm font-medium text-foreground">
                     Como você quer pagar?
                   </p>
                   <div className="space-y-3">
-                    <OpcaoPagamento
-                      icone={QrCode}
-                      titulo="Pix"
-                      descricao="Aprovação na hora"
-                      onClick={() => setEtapa("pix")}
-                    />
-                    <OpcaoPagamento
-                      icone={CreditCard}
-                      titulo="Cartão"
-                      descricao="Crédito ou débito"
-                      onClick={() => setEtapa("cartao")}
-                    />
+                    {iniciando ? (
+                      <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" /> Abrindo pagamento…
+                      </div>
+                    ) : (
+                      <>
+                        <OpcaoPagamento
+                          icone={QrCode}
+                          titulo="Pix"
+                          descricao="Aprovação na hora"
+                          onClick={() => escolher("pix")}
+                        />
+                        <OpcaoPagamento
+                          icone={CreditCard}
+                          titulo="Cartão"
+                          descricao="Crédito ou débito"
+                          onClick={() => escolher("cartao")}
+                        />
+                      </>
+                    )}
                   </div>
                 </Passo>
               )}

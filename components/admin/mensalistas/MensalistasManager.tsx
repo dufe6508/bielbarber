@@ -12,10 +12,14 @@ import {
   CalendarClock,
   UserMinus,
   Scissors,
+  FileText,
+  Users,
+  Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminModal, Campo, inputCls } from "@/components/admin/AdminModal";
 import { Pill } from "@/components/admin/primitives";
+import { CobrancasManager } from "@/components/admin/mensalistas/CobrancasManager";
 import { formatarPreco, formatarData, formatarTelefone } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +47,7 @@ const ESTADO: Record<
 };
 
 export function MensalistasManager() {
+  const [aba, setAba] = useState<"mensalistas" | "cobrancas">("mensalistas");
   const [lista, setLista] = useState<Mensalista[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modal, setModal] = useState(false);
@@ -50,6 +55,7 @@ export function MensalistasManager() {
   const [nome, setNome] = useState("");
   const [diaCobranca, setDiaCobranca] = useState<10 | 30>(10);
   const [salvando, setSalvando] = useState(false);
+  const [emitindo, setEmitindo] = useState<string | null>(null);
 
   async function carregar() {
     setCarregando(true);
@@ -113,10 +119,70 @@ export function MensalistasManager() {
     carregar();
   }
 
+  // Emite uma cobrança manual imediata para o mensalista.
+  async function emitirCobranca(m: Mensalista) {
+    setEmitindo(m.id);
+    try {
+      const res = await fetch(`/api/admin/mensalistas/${m.id}/cobrancas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const dados = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(dados?.error ?? "Não foi possível emitir.");
+        return;
+      }
+      toast.success("Cobrança emitida e enviada ao cliente.");
+      setAba("cobrancas");
+    } catch {
+      toast.error("Erro ao emitir cobrança.");
+    } finally {
+      setEmitindo(null);
+    }
+  }
+
   const ativos = lista.filter((m) => m.status === "ativo");
 
   return (
     <div>
+      {/* Segmented control: Mensalistas / Cobranças */}
+      <div className="mb-5 inline-flex rounded-full border border-border bg-card p-1">
+        {(
+          [
+            { id: "mensalistas" as const, rotulo: "Mensalistas", icone: Users },
+            { id: "cobrancas" as const, rotulo: "Cobranças", icone: Receipt },
+          ]
+        ).map((t) => {
+          const on = aba === t.id;
+          const Icone = t.icone;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setAba(t.id)}
+              className={cn(
+                "relative inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {on && (
+                <motion.span
+                  layoutId="mensalistas-aba"
+                  className="absolute inset-0 rounded-full bg-primary"
+                  transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                />
+              )}
+              <Icone className="relative size-3.5" />
+              <span className="relative">{t.rotulo}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {aba === "cobrancas" ? (
+        <CobrancasManager />
+      ) : (
+      <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">
           <GrupoChip dia={10} qtd={ativos.filter((m) => m.diaCobranca === 10).length} />
@@ -175,7 +241,7 @@ export function MensalistasManager() {
                   )}
                 </div>
 
-                {/* Rodapé: valor + ações */}
+                {/* Valor do ciclo */}
                 <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
                   <div className="min-w-0">
                     <p className="font-mono text-xl font-semibold tabular-nums leading-none text-foreground">
@@ -186,27 +252,41 @@ export function MensalistasManager() {
                       {m.atendimentosCiclo} {m.atendimentosCiclo === 1 ? "corte" : "cortes"} no ciclo
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <button
-                      onClick={() => marcarPago(m)}
-                      disabled={m.totalCiclo === 0}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
-                        m.totalCiclo === 0
-                          ? "cursor-not-allowed bg-muted/50 text-muted-foreground/50"
-                          : "bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400"
-                      )}
-                    >
-                      <CheckCircle2 className="size-3.5" /> Pago
-                    </button>
-                    <button
-                      onClick={() => desativar(m)}
-                      className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
-                      aria-label="Remover"
-                    >
-                      <UserMinus className="size-4" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => desativar(m)}
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+                    aria-label="Remover"
+                  >
+                    <UserMinus className="size-4" />
+                  </button>
+                </div>
+
+                {/* Ações: emitir cobrança + marcar pago direto */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => emitirCobranca(m)}
+                    disabled={emitindo === m.id}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+                  >
+                    {emitindo === m.id ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <FileText className="size-3.5" />
+                    )}
+                    Emitir cobrança
+                  </button>
+                  <button
+                    onClick={() => marcarPago(m)}
+                    disabled={m.totalCiclo === 0}
+                    className={cn(
+                      "inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-colors",
+                      m.totalCiclo === 0
+                        ? "cursor-not-allowed bg-muted/50 text-muted-foreground/50"
+                        : "bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400"
+                    )}
+                  >
+                    <CheckCircle2 className="size-3.5" /> Quitar ciclo
+                  </button>
                 </div>
               </motion.li>
             );
@@ -265,6 +345,8 @@ export function MensalistasManager() {
           </button>
         </div>
       </AdminModal>
+      </>
+      )}
     </div>
   );
 }

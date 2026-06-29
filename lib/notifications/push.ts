@@ -57,6 +57,26 @@ function montarPayload(event: NotificationEvent): Payload {
         body: "Abriu vaga no dia que você queria. Corre que é por ordem de chegada.",
         url: "/agendar",
       };
+    case "cobranca_emitida":
+      return {
+        title: "Mensalidade disponível para pagamento",
+        body: `Sua mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")} já pode ser paga. Toque para pagar.`,
+        url: "/mensalista",
+      };
+    case "cobranca_lembrete":
+      return {
+        title: event.vencido ? "Mensalidade vencida" : "Lembrete de mensalidade",
+        body: event.vencido
+          ? `Sua mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")} está vencida. Pague para regularizar.`
+          : `Não esqueça: mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")} aguardando pagamento.`,
+        url: "/mensalista",
+      };
+    case "cobranca_confirmada":
+      return {
+        title: "Pagamento confirmado",
+        body: `Recebemos sua mensalidade de R$ ${event.valor.toFixed(2).replace(".", ",")}. Obrigado!`,
+        url: "/mensalista",
+      };
   }
 }
 

@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
-import { Search, Loader2, Wallet, CalendarClock, Scissors } from "lucide-react";
+import {
+  Search,
+  Loader2,
+  Wallet,
+  CalendarClock,
+  Scissors,
+  AlertTriangle,
+  CheckCircle2,
+  Receipt,
+} from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PagamentoDrawer } from "@/components/PagamentoDrawer";
 import { Input } from "@/components/ui/input";
@@ -14,6 +23,7 @@ import {
   formatarPreco,
 } from "@/lib/utils/format";
 import { lembrarTelefone, telefoneLembrado } from "@/lib/utils/telefone";
+import { cn } from "@/lib/utils";
 
 type Servico = { nome: string; preco: string };
 type Corte = {
@@ -34,9 +44,44 @@ type Resultado =
       total: number;
     };
 
+type Aberta = {
+  id: string;
+  valor: string;
+  status: "pendente" | "vencido";
+  vencimento: string | null;
+  descricao: string | null;
+};
+type ItemHistorico = {
+  id: string;
+  valor: string;
+  status: string;
+  vencimento: string | null;
+  metodo: string | null;
+  pagoEm: string | null;
+  comprovanteUrl: string | null;
+  criadoEm: string;
+};
+type CobrancaCliente = { nome: string; aberta: Aberta | null; historico: ItemHistorico[] };
+
+const STATUS_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  pago: "Pago",
+  vencido: "Vencido",
+  cancelado: "Cancelado",
+  expirado: "Expirado",
+};
+const METODO_LABEL: Record<string, string> = {
+  pix: "Pix",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+  dinheiro: "Dinheiro",
+  outro: "Outro",
+};
+
 export default function MensalistaPage() {
   const [telefone, setTelefone] = useState("");
   const [pagar, setPagar] = useState(false);
+  const [cobranca, setCobranca] = useState<CobrancaCliente | null>(null);
 
   const busca = useMutation<Resultado, Error, string>({
     mutationFn: async (tel: string) => {
@@ -47,6 +92,19 @@ export default function MensalistaPage() {
     },
   });
 
+  async function carregarCobrancas(tel: string) {
+    try {
+      const res = await fetch(`/api/cobrancas/${tel}`);
+      if (!res.ok) {
+        setCobranca(null);
+        return;
+      }
+      setCobranca(await res.json());
+    } catch {
+      setCobranca(null);
+    }
+  }
+
   // Pré-preenche (e já entra) com o telefone usado no agendamento
   useEffect(() => {
     const t = telefoneLembrado();
@@ -54,6 +112,7 @@ export default function MensalistaPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill do telefone lembrado no mount
       setTelefone(formatarTelefone(t));
       busca.mutate(t);
+      carregarCobrancas(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -64,6 +123,7 @@ export default function MensalistaPage() {
     if (tel.length < 10) return;
     lembrarTelefone(tel);
     busca.mutate(tel);
+    carregarCobrancas(tel);
   }
 
   const podeBuscar = telefoneNumeros(telefone).length >= 10;
@@ -148,6 +208,56 @@ export default function MensalistaPage() {
             </span>
           </div>
 
+          {/* Cobrança em aberto — CTA principal de pagamento */}
+          {cobranca?.aberta && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn(
+                "mt-6 overflow-hidden rounded-2xl border p-5 shadow-md",
+                cobranca.aberta.status === "vencido"
+                  ? "border-amber-500/40 bg-amber-500/[0.07] dark:border-amber-400/30 dark:bg-amber-400/[0.08]"
+                  : "border-border bg-card"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-flex size-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                  {cobranca.aberta.status === "vencido" ? (
+                    <AlertTriangle className="size-5" />
+                  ) : (
+                    <Wallet className="size-5" />
+                  )}
+                </span>
+                <div>
+                  <p className="font-heading text-base font-semibold text-foreground">
+                    {cobranca.aberta.status === "vencido"
+                      ? "Mensalidade vencida"
+                      : "Mensalidade pendente"}
+                  </p>
+                  {cobranca.aberta.vencimento && (
+                    <p className="text-xs text-muted-foreground">
+                      Vence {formatarData(cobranca.aberta.vencimento)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 flex items-baseline justify-between">
+                <span className="text-sm text-muted-foreground">Valor</span>
+                <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                  {formatarPreco(cobranca.aberta.valor)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPagar(true)}
+                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
+              >
+                <Wallet className="size-4" />
+                Efetuar pagamento
+              </button>
+            </motion.div>
+          )}
+
           {r.agendamentos.length === 0 ? (
             <EstadoVazio
               icone={Scissors}
@@ -209,23 +319,83 @@ export default function MensalistaPage() {
                     </motion.span>
                   </AnimatePresence>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPagar(true)}
-                  className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
-                >
-                  <Wallet className="size-4" />
-                  Pagar mensalidade
-                </button>
+                {/* Sem cobrança formal ainda: o ciclo segue aberto até o fechamento. */}
+                {!cobranca?.aberta && (
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    A cobrança é gerada no dia do fechamento. Você será avisado
+                    quando puder pagar.
+                  </p>
+                )}
               </div>
-
-              <PagamentoDrawer
-                open={pagar}
-                onOpenChange={setPagar}
-                total={r.total}
-              />
             </>
           )}
+
+          {/* Histórico de pagamentos */}
+          {cobranca && cobranca.historico.length > 0 && (
+            <div className="mt-8">
+              <h2 className="mb-3 flex items-center gap-1.5 font-heading text-sm font-semibold text-foreground">
+                <Receipt className="size-4 text-muted-foreground" />
+                Histórico de cobranças
+              </h2>
+              <ul className="space-y-2">
+                {cobranca.historico.map((h) => (
+                  <li
+                    key={h.id}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 shadow-xs"
+                  >
+                    <span
+                      className={cn(
+                        "inline-flex size-9 shrink-0 items-center justify-center rounded-lg",
+                        h.status === "pago"
+                          ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {h.status === "pago" ? (
+                        <CheckCircle2 className="size-4" />
+                      ) : (
+                        <Wallet className="size-4" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {STATUS_LABEL[h.status] ?? h.status}
+                        {h.metodo && (
+                          <span className="font-normal text-muted-foreground">
+                            {" "}
+                            · {METODO_LABEL[h.metodo] ?? h.metodo}
+                          </span>
+                        )}
+                      </p>
+                      <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {h.pagoEm
+                          ? `Pago ${formatarData(h.pagoEm)}`
+                          : h.vencimento
+                            ? `Vence ${formatarData(h.vencimento)}`
+                            : formatarData(h.criadoEm)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">
+                      {formatarPreco(h.valor)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <PagamentoDrawer
+            open={pagar}
+            onOpenChange={setPagar}
+            total={cobranca?.aberta ? Number(cobranca.aberta.valor) : r.total}
+            chargeId={cobranca?.aberta?.id}
+            vencimento={cobranca?.aberta?.vencimento}
+            descricao={cobranca?.aberta?.descricao}
+            onPago={() => {
+              const tel = telefoneNumeros(telefone);
+              if (tel.length >= 10) carregarCobrancas(tel);
+            }}
+          />
         </motion.div>
       )}
     </div>
