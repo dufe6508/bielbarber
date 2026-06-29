@@ -309,6 +309,14 @@
   }
 }
 
+/* Previne seleção de texto e tap-highlight em gráficos no mobile */
+.recharts-wrapper,
+.recharts-surface {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Respeita preferência de movimento reduzido */
 @media (prefers-reduced-motion: reduce) {
   *,
