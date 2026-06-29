@@ -41,7 +41,8 @@ export async function enviarPushParaAdmin(payload: PushPayload): Promise<void> {
   });
   if (assinaturas.length === 0) return;
 
-  const corpo = JSON.stringify(payload);
+  const BANNER = `${process.env.NEXT_PUBLIC_APP_URL || ""}/banner-notificacao.jpg`;
+  const corpo = JSON.stringify({ image: BANNER, ...payload });
 
   await Promise.all(
     assinaturas.map(async (s) => {
@@ -91,7 +92,8 @@ export async function enviarPushParaCliente(
   });
   if (assinaturas.length === 0) return;
 
-  const corpo = JSON.stringify(payload);
+  const BANNER = `${process.env.NEXT_PUBLIC_APP_URL || ""}/banner-notificacao.jpg`;
+  const corpo = JSON.stringify({ image: BANNER, ...payload });
 
   await Promise.all(
     assinaturas.map(async (s) => {
