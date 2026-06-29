@@ -116,25 +116,23 @@ export function NotificationCenter({
       <AnimatePresence>
         {aberto && (
           <motion.div
-            className="fixed inset-0 z-[60] flex items-end justify-center md:items-start md:justify-end md:p-4 md:pt-[68px]"
+            className="fixed inset-0 z-[60] flex items-start justify-end p-4 pt-[68px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <button
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm md:bg-black/20"
+              className="absolute inset-0 bg-black/20 backdrop-blur-sm"
               onClick={() => setAberto(false)}
               aria-label="Fechar"
             />
             <motion.div
-              initial={{ y: "8%", opacity: 0, scale: 0.98 }}
+              initial={{ y: "-4%", opacity: 0, scale: 0.97 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: "6%", opacity: 0, scale: 0.98 }}
+              exit={{ y: "-3%", opacity: 0, scale: 0.97 }}
               transition={{ type: "spring", stiffness: 380, damping: 34 }}
-              className="relative flex max-h-[82dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-border bg-card shadow-2xl md:max-h-[72vh] md:max-w-[400px] md:rounded-2xl"
+              className="relative flex max-h-[80dvh] w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
             >
-              {/* Grab handle (mobile) */}
-              <div className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-border md:hidden" />
 
               {/* Header */}
               <div className="flex shrink-0 items-center justify-between gap-2 px-5 pb-3 pt-3.5">
