@@ -15,16 +15,19 @@ self.addEventListener("push", (event) => {
     dados = { title: "Biel Barber", body: event.data ? event.data.text() : "" };
   }
   const title = dados.title || "Biel Barber Shop";
+  const acoes = Array.isArray(dados.actions) && dados.actions.length > 0
+    ? dados.actions.slice(0, 2)
+    : [{ action: "abrir", title: "Abrir app" }];
   event.waitUntil(
     self.registration.showNotification(title, {
       body: dados.body || "",
       icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      badge: "/badge-96.png",
       tag: dados.tag || undefined,
       renotify: Boolean(dados.tag),
       requireInteraction: Boolean(dados.requireInteraction),
       vibrate: [60, 40, 60],
-      actions: Array.isArray(dados.actions) ? dados.actions.slice(0, 2) : [],
+      actions: acoes,
       data: { url: dados.url || "/" },
     })
   );
