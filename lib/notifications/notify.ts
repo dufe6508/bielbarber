@@ -2,11 +2,11 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { montarSpecs, type NotificationSpec } from "./catalog";
 import type { NotificationEvent } from "./events";
-import { enviarPushParaCliente } from "./push";
+import { enviarPushParaAdmin, enviarPushParaCliente } from "./push";
 
 // ─── Dispatcher central de notificações ─────────────────────────────────────
 // ÚNICO ponto de entrada. notify(event) → grava a(s) linha(s) na inbox (o sino
-// lê daqui) e entrega push best-effort. Admin não recebe push (usa só o sino).
+// lê daqui) e entrega push best-effort.
 // Spec de cliente SEM clienteId = broadcast para todos os clientes ativos.
 
 export async function notify(event: NotificationEvent): Promise<void> {
@@ -30,6 +30,13 @@ export async function notify(event: NotificationEvent): Promise<void> {
             { title: s.titulo, body: s.mensagem, url: s.actionUrl ?? "/", ...s.push },
             s.prefFlag
           );
+        } else if (s.audiencia === "admin") {
+          await enviarPushParaAdmin({
+            title: s.titulo,
+            body: s.mensagem,
+            url: s.actionUrl ?? "/admin",
+            ...s.push,
+          });
         }
       }
     } catch (e) {

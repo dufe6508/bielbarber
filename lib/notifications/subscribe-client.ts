@@ -53,6 +53,48 @@ export async function ativarPush(telefone: string): Promise<void> {
   }
 }
 
+// Ativa push no navegador do admin e registra no backend. Best-effort.
+export async function ativarPushAdmin(): Promise<void> {
+  try {
+    if (
+      !VAPID_PUBLIC ||
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      return;
+    }
+
+    const permissao = Notification.permission === "granted"
+      ? "granted"
+      : await Notification.requestPermission();
+    if (permissao !== "granted") return;
+
+    const reg = await navigator.serviceWorker.ready;
+    const existente = await reg.pushManager.getSubscription();
+    const sub =
+      existente ??
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64ParaUint8(VAPID_PUBLIC) as BufferSource,
+      }));
+
+    const json = sub.toJSON();
+    await fetch("/api/admin/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: sub.endpoint,
+        p256dh: json.keys?.p256dh,
+        auth: json.keys?.auth,
+        userAgent: navigator.userAgent,
+      }),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
 // Desativa o push deste navegador: cancela a assinatura local e a marca inativa
 // no backend. Best-effort (não lança).
 export async function desativarPush(): Promise<void> {

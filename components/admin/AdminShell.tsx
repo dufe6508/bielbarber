@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { ativarPushAdmin } from "@/lib/notifications/subscribe-client";
 import { AnimatePresence, motion } from "motion/react";
 import { LogOut, Loader2, MapPin, MoreHorizontal, X } from "lucide-react";
 import { navAdmin, rotaAtivaAdmin } from "@/lib/navAdmin";
@@ -28,6 +29,8 @@ export function AdminShell({
   const [saindo, setSaindo] = useState(false);
   const [maisAberto, setMaisAberto] = useState(false);
   const [confirmandoSaida, setConfirmandoSaida] = useState(false);
+
+  useEffect(() => { ativarPushAdmin(); }, []);
 
   const primarios = navAdmin.filter((i) => PRIMARIOS.includes(i.href));
   const secundarios = navAdmin.filter((i) => !PRIMARIOS.includes(i.href));

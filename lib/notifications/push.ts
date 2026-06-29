@@ -32,6 +32,39 @@ function dentroSilencio(inicio: number | null, fim: number | null): boolean {
   return inicio <= fim ? h >= inicio && h < fim : h >= inicio || h < fim;
 }
 
+// Envia push para todas as assinaturas ativas do admin. No-op se VAPID ausente.
+export async function enviarPushParaAdmin(payload: PushPayload): Promise<void> {
+  if (!configurar()) return;
+
+  const assinaturas = await prisma.adminPushSubscription.findMany({
+    where: { ativo: true },
+  });
+  if (assinaturas.length === 0) return;
+
+  const corpo = JSON.stringify(payload);
+
+  await Promise.all(
+    assinaturas.map(async (s) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          corpo
+        );
+      } catch (err) {
+        const status = (err as { statusCode?: number })?.statusCode;
+        if (status === 404 || status === 410) {
+          await prisma.adminPushSubscription.update({
+            where: { id: s.id },
+            data: { ativo: false },
+          });
+        } else {
+          console.error("[push:admin] falha ao enviar", s.endpoint, status);
+        }
+      }
+    })
+  );
+}
+
 // Envia push para todas as assinaturas ativas do cliente, respeitando a
 // preferência do tipo (prefFlag) e o silêncio noturno. No-op se VAPID ausente.
 export async function enviarPushParaCliente(
