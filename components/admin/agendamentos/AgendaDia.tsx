@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
   Phone,
   Moon,
-  Loader2,
 } from "lucide-react";
 import { Pill } from "@/components/admin/primitives";
 import {

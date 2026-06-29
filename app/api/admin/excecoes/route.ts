@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GRADE_HORARIOS } from "@/lib/utils/slots";
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
     update: { tipo, horarios, motivo },
     create: { data: new Date(data), tipo, horarios, motivo },
   });
+  revalidateTag(`slots-${data}`, {});
   return NextResponse.json(excecao);
 }
 
@@ -65,5 +67,6 @@ export async function DELETE(request: Request) {
   await prisma.scheduleException
     .delete({ where: { data: new Date(data) } })
     .catch(() => null);
+  revalidateTag(`slots-${data}`, {});
   return NextResponse.json({ ok: true });
 }

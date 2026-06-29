@@ -1,40 +1,57 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
+import { sendPushToClient } from "@/lib/notifications/push";
 
-export async function GET() {
+import { z } from "zod";
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+  const skip = (page - 1) * limit;
+  const desdeStr = searchParams.get("desde");
+  const desde = desdeStr ? new Date(desdeStr) : new Date();
+
   const agendamentos = await prisma.appointment.findMany({
+    where: { data: { gte: desde } },
     include: { cliente: true, servicos: { include: { servico: true } } },
     orderBy: [{ data: "asc" }, { horarioInicio: "asc" }],
+    skip,
+    take: limit,
   });
   return NextResponse.json(agendamentos);
 }
 
-type Body = {
-  nome: string;
-  telefone: string;
-  data: string; // YYYY-MM-DD
-  horario: string; // HH:MM (início)
-  horarioFim?: string | null; // HH:MM (2º slot, coloração)
-  formaPagamento: "pix" | "cartao" | "local" | "mensalista";
-  servicoIds: string[];
-};
+const AgendamentoSchema = z.object({
+  nome: z.string().min(1, "O nome é obrigatório"),
+  telefone: z.string().min(10, "Telefone inválido"),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
+  horario: z.string().regex(/^\d{2}:\d{2}$/, "Horário inválido"),
+  horarioFim: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  formaPagamento: z.enum(["pix", "cartao", "local", "mensalista"]),
+  servicoIds: z.array(z.string()).min(1, "Selecione ao menos um serviço"),
+});
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as Body;
-  const { nome, telefone, data, horario, horarioFim, formaPagamento, servicoIds } =
-    body;
-
-  // Validação mínima
-  if (!nome?.trim() || !telefone || !data || !horario || !formaPagamento) {
-    return NextResponse.json({ error: "Dados incompletos." }, { status: 400 });
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 });
   }
-  if (!servicoIds?.length) {
+
+  const parseResult = AgendamentoSchema.safeParse(body);
+  if (!parseResult.success) {
     return NextResponse.json(
-      { error: "Selecione ao menos um serviço." },
+      { error: parseResult.error.issues[0]?.message || "Dados inválidos." },
       { status: 400 }
     );
   }
+
+  const { nome, telefone, data, horario, horarioFim, formaPagamento, servicoIds } =
+    parseResult.data;
 
   // Busca os serviços para travar o preço no momento do agendamento
   const servicos = await prisma.service.findMany({
@@ -78,61 +95,82 @@ export async function POST(request: Request) {
     );
   }
 
-  // Cria ou reaproveita o cliente pelo telefone
-  const cliente = await prisma.client.upsert({
-    where: { telefone },
-    update: { nome },
-    create: { nome, telefone },
-    include: { mensalidade: true },
-  });
-
-  if (cliente.bloqueado) {
-    return NextResponse.json(
-      { error: "Não foi possível concluir o agendamento. Fale com a barbearia." },
-      { status: 403 }
-    );
-  }
-
-  // Mensalista: só aceita se o cliente tiver assinatura ativa
   const ehMensalista = formaPagamento === "mensalista";
-  if (ehMensalista) {
-    if (!cliente.mensalidade || cliente.mensalidade.status !== "ativo") {
-      return NextResponse.json(
-        {
-          error:
-            "Você não está cadastrado como mensalista. Escolha outra forma de pagamento.",
-        },
-        { status: 403 }
-      );
-    }
-  }
-
-  // Mensalista paga depois (no fechamento do ciclo) → registra como "local"/pendente
   const formaFinal = ehMensalista ? "local" : formaPagamento;
   const valorTotal = servicos.reduce(
     (acc: number, s) => acc + Number(s.preco),
     0
   );
 
-  const agendamento = await prisma.appointment.create({
-    data: {
-      clienteId: cliente.id,
-      data: new Date(data),
-      horarioInicio: horario,
-      slots: slotsNecessarios,
-      formaPagamento: formaFinal,
-      valorTotal,
-      servicos: {
-        create: servicos.map((s) => ({
-          servicoId: s.id,
-          precoNaHora: s.preco,
-        })),
-      },
-    },
-  });
+  try {
+    const agendamento = await prisma.$transaction(async (tx) => {
+      // Cria ou reaproveita o cliente pelo telefone
+      const cliente = await tx.client.upsert({
+        where: { telefone },
+        update: { nome },
+        create: { nome, telefone },
+        include: { mensalidade: true },
+      });
 
-  // Código curto para o ticket
-  const codigo = agendamento.id.slice(0, 8).toUpperCase();
+      if (cliente.bloqueado) {
+        // Marcador pra distinguir no catch e responder 403 com { bloqueado: true }.
+        throw new Error("BLOQUEADO");
+      }
 
-  return NextResponse.json({ id: agendamento.id, codigo }, { status: 201 });
+      // Mensalista: só aceita se o cliente tiver assinatura ativa
+      if (ehMensalista) {
+        if (!cliente.mensalidade || cliente.mensalidade.status !== "ativo") {
+          throw new Error("Você não está cadastrado como mensalista. Escolha outra forma de pagamento.");
+        }
+      }
+
+      const novo = await tx.appointment.create({
+        data: {
+          clienteId: cliente.id,
+          data: new Date(data),
+          horarioInicio: horario,
+          slots: slotsNecessarios,
+          formaPagamento: formaFinal,
+          valorTotal,
+          servicos: {
+            create: servicos.map((s) => ({
+              servicoId: s.id,
+              precoNaHora: s.preco,
+            })),
+          },
+        },
+      });
+
+      return novo;
+    });
+
+    // Invalida o cache de slots da data agendada
+    revalidateTag(`slots-${data}`, {});
+
+    // Push de confirmação (best-effort — no-op se o cliente ainda não assinou)
+    void sendPushToClient(agendamento.clienteId, {
+      type: "agendamento_confirmado",
+      appointmentId: agendamento.id,
+    });
+
+    // Código curto para o ticket
+    const codigo = agendamento.id.slice(0, 8).toUpperCase();
+
+    return NextResponse.json({ id: agendamento.id, codigo }, { status: 201 });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "";
+    if (msg === "BLOQUEADO") {
+      return NextResponse.json(
+        {
+          error: "Não foi possível concluir o agendamento. Fale com a barbearia.",
+          bloqueado: true,
+        },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { error: msg || "Erro ao processar agendamento." },
+      { status: 403 }
+    );
+  }
 }

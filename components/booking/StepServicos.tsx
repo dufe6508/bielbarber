@@ -7,18 +7,14 @@ import {
   motion,
   useReducedMotion,
   type PanInfo,
-} from "framer-motion";
+} from "motion/react";
 import { Check, Layers } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
 import { slotsQueryOptions } from "@/lib/queries/slots";
 import { formatarPreco } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+import { proximaHora } from "@/lib/utils/horarios";
 
-// "HH:00" → próxima hora "HH+1:00"
-function proximaHora(h: string): string {
-  const hora = Number(h.split(":")[0]);
-  return `${String(hora + 1).padStart(2, "0")}:00`;
-}
 
 type Servico = {
   id: string;
@@ -122,6 +118,7 @@ export function StepServicos() {
       if (!res.ok) throw new Error("Erro ao carregar serviços");
       return res.json();
     },
+    staleTime: Infinity,
   });
 
   // Páginas a partir das categorias (ordem preservada). Sobras → "Outros".

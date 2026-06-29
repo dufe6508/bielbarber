@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, MapPin } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
 import { formatarTelefone, telefoneNumeros } from "@/lib/utils/format";
@@ -20,14 +20,23 @@ export function StepIdentificacao() {
   const digitos = telefoneNumeros(telefone);
   const completo = digitos.length >= 10;
 
+  // Debounce: só busca quando o número para de mudar por 250ms — evita disparar
+  // a cada dígito (10º e 11º) enquanto o cliente ainda digita.
+  const [digitosBusca, setDigitosBusca] = useState("");
+  useEffect(() => {
+    if (!completo) return;
+    const t = setTimeout(() => setDigitosBusca(digitos), 250);
+    return () => clearTimeout(t);
+  }, [digitos, completo]);
+
   const { data: rec } = useQuery<Reconhecimento>({
-    queryKey: ["cliente", digitos],
+    queryKey: ["cliente", digitosBusca],
     queryFn: async () => {
-      const res = await fetch(`/api/clientes/${digitos}`);
+      const res = await fetch(`/api/clientes/${digitosBusca}`);
       if (!res.ok) throw new Error("Erro");
       return res.json();
     },
-    enabled: completo,
+    enabled: digitosBusca.length >= 10,
     staleTime: 5 * 60 * 1000,
   });
 

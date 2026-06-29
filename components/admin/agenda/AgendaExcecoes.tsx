@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import {
   CalendarOff,
   CalendarRange,
@@ -254,8 +254,8 @@ export function AgendaExcecoes() {
         onOpenChange={setCalAberto}
         className="mx-auto max-w-sm"
       >
-        <div className="mx-auto max-w-[320px]">
-          <div className="rounded-2xl bg-gradient-to-b from-card to-card/30 p-3 ring-1 ring-inset ring-border/50 shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_6%,transparent)]">
+        <div className="mx-auto max-w-[336px]">
+          <div className="rounded-2xl border border-border bg-background p-3 sm:p-4">
             <MiniCalendar
               selected={diaSel}
               onSelect={selecionarDia}

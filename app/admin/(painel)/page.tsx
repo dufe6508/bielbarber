@@ -1,16 +1,10 @@
 import Link from "next/link";
 import {
   Wallet,
-  Scissors,
-  ShoppingBag,
-  CalendarCheck,
   CalendarClock,
-  TrendingUp,
-  Gauge,
-  UserPlus,
-  XCircle,
+  Users,
+  PiggyBank,
   ChevronRight,
-  CalendarRange,
 } from "lucide-react";
 import {
   AdminPage,
@@ -19,21 +13,16 @@ import {
   SectionCard,
 } from "@/components/admin/primitives";
 import { MonthSelector } from "@/components/admin/MonthSelector";
-import {
-  ReceitaBarChart,
-  RankingBarChart,
-  OcupacaoBarChart,
-} from "@/components/admin/Charts";
+import { ReceitaBarChart } from "@/components/admin/Charts";
 import {
   janelaMes,
   receitaPorFonte,
   atendimentoNoPeriodo,
   serieReceitaPorDia,
-  servicosMaisVendidos,
-  ocupacaoPorHora,
-  novosClientes,
+  clientesAtivos,
   proximosAtendimentos,
 } from "@/lib/admin/metrics";
+import { resumoContabil } from "@/lib/admin/accounting";
 import { formatarPreco } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -57,102 +46,66 @@ export default async function DashboardPage({
   const mesParam = `${ano}-${String(mesIndex + 1).padStart(2, "0")}`;
   const { desde, ate } = janelaMes(ano, mesIndex);
 
-  const [fonte, atend, serie, ranking, ocupacao, novos, proximos] = await Promise.all([
+  const [fonte, atend, serie, ativos, conta, proximos] = await Promise.all([
     receitaPorFonte(desde, ate),
     atendimentoNoPeriodo(desde, ate),
     serieReceitaPorDia(desde, ate),
-    servicosMaisVendidos(6),
-    ocupacaoPorHora(),
-    novosClientes(desde, ate),
+    clientesAtivos(2),
+    resumoContabil(ano, mesIndex),
     proximosAtendimentos(8),
   ]);
 
-  const ticket = atend.concluidos ? fonte.servicos / atend.concluidos : 0;
   const ags = "/admin/agendamentos";
 
   return (
     <AdminPage>
       <AdminHeader
         titulo="Visão geral"
-        descricao="Como anda a barbearia no mês. Toque nos cards para abrir os detalhes."
+        descricao="O essencial do mês. Toque nos cards para abrir os detalhes."
         acao={<MonthSelector atual={mesParam} />}
       />
 
-      {/* Hero + grade de métricas — 2 colunas no mobile, 4 no desktop */}
+      {/* Só o essencial — 1 hero + 3 métricas */}
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
         <div className="col-span-2">
           <StatCard
             rotulo="Faturamento do mês"
             valor={formatarPreco(fonte.total)}
             icone={Wallet}
-            hint={`${atend.concluidos} atendimentos · ticket ${formatarPreco(ticket)}`}
+            hint={`${atend.concluidos} atendimentos concluídos`}
             href="/admin/financeiro"
             destaque
           />
         </div>
 
         <StatCard
-          rotulo="Serviços"
-          valor={formatarPreco(fonte.servicos)}
-          icone={Scissors}
-        />
-        <StatCard
-          rotulo="Loja"
-          valor={formatarPreco(fonte.loja)}
-          icone={ShoppingBag}
+          rotulo="Lucro líquido"
+          valor={formatarPreco(conta.lucroLiquido)}
+          icone={PiggyBank}
+          hint="Após despesas"
           href="/admin/financeiro"
-        />
-        <StatCard
-          rotulo="Ticket médio"
-          valor={formatarPreco(ticket)}
-          icone={TrendingUp}
-        />
-        <StatCard
-          rotulo="Novos clientes"
-          valor={String(novos)}
-          icone={UserPlus}
-          hint="cadastrados no mês"
-        />
-
-        <StatCard
-          rotulo="Concluídos"
-          valor={String(atend.concluidos)}
-          icone={CalendarCheck}
-          href={`${ags}?status=concluido`}
         />
         <StatCard
           rotulo="Agendados"
           valor={String(atend.agendados)}
           icone={CalendarClock}
+          hint="Ativos no mês"
           href={`${ags}?status=agendado`}
         />
-        <StatCard
-          rotulo="Ocupação"
-          valor={`${Math.round(atend.taxaOcupacao * 100)}%`}
-          icone={Gauge}
-          hint="ver horários cheios"
-          href={`${ags}?status=agendado`}
-        />
-        <StatCard
-          rotulo="Cancelados"
-          valor={String(atend.cancelados)}
-          icone={XCircle}
-          href={`${ags}?status=cancelado`}
-        />
+        <div className="col-span-2 lg:col-span-1">
+          <StatCard
+            rotulo="Clientes ativos"
+            valor={String(ativos)}
+            icone={Users}
+            hint="Marcaram nos últimos 2 meses"
+            href="/admin/clientes"
+          />
+        </div>
       </div>
 
       <div className="mt-5">
         <SectionCard titulo="Receita no mês">
           <ReceitaBarChart dados={serie} />
-        </SectionCard>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <SectionCard titulo="Mais vendidos">
-          <RankingBarChart dados={ranking} />
-        </SectionCard>
-        <SectionCard titulo="Horários mais cheios">
-          <OcupacaoBarChart dados={ocupacao} />
         </SectionCard>
       </div>
 

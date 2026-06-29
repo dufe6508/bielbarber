@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-// Logo redonda. Se /biel-logo.png não existir, mostra um fallback com a inicial.
-export function Logo({ className }: { className?: string }) {
+// Logo redonda. `src` vem do perfil salvo; cai em /biel-logo.png por padrão.
+// Se a imagem não existir, mostra um fallback com a inicial.
+export function Logo({ className, src }: { className?: string; src?: string }) {
   const [erro, setErro] = useState(false);
 
   if (erro) {
@@ -24,7 +25,7 @@ export function Logo({ className }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/biel-logo.png"
+      src={src || "/biel-logo.png"}
       alt="Biel Barber Shop"
       onError={() => setErro(true)}
       className={cn("object-cover", className)}

@@ -11,13 +11,22 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 // Itens primários no bottom nav (mobile). O resto vai pro sheet "Mais".
-const PRIMARIOS = ["/admin", "/admin/agendamentos", "/admin/agenda", "/admin/financeiro"];
+const PRIMARIOS = ["/admin", "/admin/agendamentos", "/admin/agenda", "/admin/clientes", "/admin/financeiro"];
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+type Perfil = { nome: string; local: string; logoUrl: string };
+
+export function AdminShell({
+  children,
+  perfil,
+}: {
+  children: React.ReactNode;
+  perfil: Perfil;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [saindo, setSaindo] = useState(false);
   const [maisAberto, setMaisAberto] = useState(false);
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false);
 
   const primarios = navAdmin.filter((i) => PRIMARIOS.includes(i.href));
   const secundarios = navAdmin.filter((i) => !PRIMARIOS.includes(i.href));
@@ -31,7 +40,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     setSaindo(true);
     try {
       await fetch("/api/admin/logout", { method: "POST" });
-      router.push("/admin/login");
+      router.push("/");
       router.refresh();
     } finally {
       setSaindo(false);
@@ -44,11 +53,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <aside className="sticky top-0 hidden h-[100dvh] w-[244px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
         <div className="flex h-[68px] shrink-0 items-center gap-3 px-5">
           <span className="inline-flex shrink-0 rounded-full ring-1 ring-sidebar-border">
-            <Logo className="size-9 rounded-full" />
+            <Logo src={perfil.logoUrl} className="size-9 rounded-full" />
           </span>
           <div className="flex flex-col leading-none">
             <span className="font-heading text-[15px] font-bold tracking-tight text-sidebar-foreground">
-              Biel Barber
+              {perfil.nome}
             </span>
             <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-sidebar-foreground/45">
               Painel
@@ -96,7 +105,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex items-center gap-2 px-4 py-3.5">
           <button
-            onClick={sair}
+            onClick={() => setConfirmandoSaida(true)}
             disabled={saindo}
             className="inline-flex flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground disabled:opacity-60"
           >
@@ -108,7 +117,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex items-center gap-1.5 px-5 pb-4 text-[10px] text-sidebar-foreground/30">
           <MapPin className="size-3 shrink-0" />
-          Vale do Jatobá · BH
+          {perfil.local}
         </div>
       </aside>
 
@@ -117,25 +126,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         {/* Top bar (mobile) — limpa, sem pills */}
         <header className="sticky top-0 z-40 shrink-0 border-b border-border/60 bg-background/85 backdrop-blur-xl md:hidden">
           <div className="flex h-14 items-center gap-3 px-4">
-            <Logo className="size-8 rounded-full ring-1 ring-border" />
+            <Logo src={perfil.logoUrl} className="size-8 rounded-full ring-1 ring-border" />
             <div className="flex min-w-0 flex-col leading-none">
               <span className="truncate font-heading text-base font-semibold tracking-tight text-foreground">
                 {atualTitulo}
               </span>
               <span className="font-mono text-[8px] uppercase tracking-[0.28em] text-muted-foreground/60">
-                Biel Barber
+                {perfil.nome}
               </span>
-            </div>
-            <div className="ml-auto flex items-center gap-1">
-              <ThemeToggle className="text-muted-foreground hover:bg-muted hover:text-foreground" />
-              <button
-                onClick={sair}
-                disabled={saindo}
-                className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Sair"
-              >
-                {saindo ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
-              </button>
             </div>
           </div>
         </header>
@@ -223,20 +221,30 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 380, damping: 34 }}
-              className="relative w-full rounded-t-2xl border-t border-border bg-card p-4 pb-[calc(16px+env(safe-area-inset-bottom))]"
+              className="relative w-full rounded-t-3xl border-t border-border bg-card px-5 pt-3 pb-[calc(24px+env(safe-area-inset-bottom))] shadow-2xl"
             >
-              <div className="mb-3 flex items-center justify-between">
-                <span className="font-heading text-base font-semibold text-foreground">
-                  Mais
-                </span>
+              {/* Grab handle — affordância de arraste */}
+              <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border" />
+
+              <div className="mb-4 flex items-start justify-between">
+                <div className="flex flex-col">
+                  <span className="font-heading text-lg font-semibold tracking-tight text-foreground">
+                    Mais opções
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Cadastros e gestão do painel
+                  </span>
+                </div>
                 <button
                   onClick={() => setMaisAberto(false)}
-                  className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+                  className="-mr-1.5 inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Fechar"
                 >
-                  <X className="size-4" />
+                  <X className="size-5" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+
+              <div className="grid grid-cols-3 gap-2">
                 {secundarios.map((item) => {
                   const Icone = item.icone;
                   const ativo = rotaAtivaAdmin(pathname, item.href);
@@ -245,18 +253,102 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                       key={item.href}
                       href={item.href}
                       onClick={() => setMaisAberto(false)}
+                      aria-current={ativo ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl border p-3.5 text-sm font-medium transition-colors",
+                        "flex flex-col items-center gap-2 rounded-2xl border px-2 py-3.5 text-center transition-colors",
                         ativo
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background text-foreground hover:bg-muted"
+                          ? "border-primary/40 bg-accent/60"
+                          : "border-border/60 bg-muted/40 hover:bg-muted"
                       )}
                     >
-                      <Icone className="size-5 shrink-0" />
-                      {item.rotulo}
+                      <Icone
+                        className={cn(
+                          "size-[22px]",
+                          ativo ? "text-primary" : "text-muted-foreground"
+                        )}
+                        strokeWidth={ativo ? 2.3 : 2}
+                      />
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium leading-tight",
+                          ativo ? "text-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        {item.rotulo}
+                      </span>
                     </Link>
                   );
                 })}
+              </div>
+
+              {/* Footer do sheet — conta e preferências */}
+              <div className="mt-4 flex items-center gap-2 border-t border-border/60 pt-3">
+                <button
+                  onClick={() => {
+                    setMaisAberto(false);
+                    setConfirmandoSaida(true);
+                  }}
+                  disabled={saindo}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/70 disabled:opacity-60"
+                >
+                  {saindo ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
+                  Sair
+                </button>
+                <ThemeToggle className="size-11 shrink-0 rounded-xl bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Modal de confirmação de saída ─────────────────────── */}
+      <AnimatePresence>
+        {confirmandoSaida && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <button
+              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+              onClick={() => setConfirmandoSaida(false)}
+              aria-label="Cancelar"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ type: "spring", stiffness: 420, damping: 32 }}
+              role="dialog"
+              aria-modal="true"
+              className="relative w-full max-w-xs rounded-3xl border border-border bg-card p-6 shadow-2xl"
+            >
+              <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-muted text-foreground">
+                <LogOut className="size-5" />
+              </span>
+              <h2 className="text-center font-heading text-lg font-semibold tracking-tight text-foreground">
+                Sair do painel?
+              </h2>
+              <p className="mt-1.5 text-center text-sm text-muted-foreground">
+                Você voltará para a área do cliente.
+              </p>
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  onClick={sair}
+                  disabled={saindo}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  {saindo ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
+                  Sair
+                </button>
+                <button
+                  onClick={() => setConfirmandoSaida(false)}
+                  disabled={saindo}
+                  className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
               </div>
             </motion.div>
           </motion.div>

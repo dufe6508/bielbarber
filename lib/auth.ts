@@ -1,12 +1,20 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
+import { prisma } from "@/lib/prisma";
 
 // ─── Auth do admin ────────────────────────────────────────────────────────────
 // Gate simples por senha (só o barbeiro usa). Sem Supabase Auth: o Supabase aqui
-// é só Postgres (via Prisma). A senha vive em ADMIN_PASSWORD; a sessão é um token
-// assinado por HMAC guardado num cookie httpOnly. A entrada oculta (long-press no
-// logo) é só descoberta — a segurança real é a verificação no servidor.
+// é só Postgres (via Prisma). A senha trocável fica como hash scrypt na tabela
+// `configuracoes`; ADMIN_PASSWORD é só o fallback inicial (antes da 1ª troca). A
+// sessão é um token assinado por HMAC num cookie httpOnly. A entrada oculta
+// (long-press no logo) é só descoberta — a segurança real é a verificação no servidor.
+
+const CHAVE_SENHA = "admin_senha_hash";
+
+function hashSenha(senha: string, salt: string): string {
+  return crypto.scryptSync(senha, salt, 64).toString("hex");
+}
 
 export const ADMIN_COOKIE = "bb_admin";
 export const ADMIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 dias
@@ -40,10 +48,28 @@ export function tokenValido(token: string | undefined | null): boolean {
   return comparaConstante(assinatura, assinar(payload));
 }
 
-export function verificarSenha(senha: unknown): boolean {
+export async function verificarSenha(senha: unknown): Promise<boolean> {
   if (typeof senha !== "string") return false;
+  const linha = await prisma.setting.findUnique({ where: { chave: CHAVE_SENHA } });
+  if (linha) {
+    const [salt, hash] = linha.valor.split(":");
+    if (!salt || !hash) return false;
+    return comparaConstante(hashSenha(senha, salt), hash);
+  }
+  // Fallback: senha de ambiente, válida até a primeira troca pela UI.
   const esperada = process.env.ADMIN_PASSWORD || "biel";
   return comparaConstante(senha, esperada);
+}
+
+// Troca a senha do admin (guarda salt:hash em scrypt na tabela de config).
+export async function definirSenha(nova: string): Promise<void> {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const valor = `${salt}:${hashSenha(nova, salt)}`;
+  await prisma.setting.upsert({
+    where: { chave: CHAVE_SENHA },
+    update: { valor },
+    create: { chave: CHAVE_SENHA, valor },
+  });
 }
 
 // Usa em Server Components, layouts e Route Handlers do admin.

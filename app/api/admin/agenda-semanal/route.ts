@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { getAgendaSemanal, salvarAgendaDia } from "@/lib/utils/slots";
 
@@ -34,5 +35,6 @@ export async function PUT(request: Request) {
   }
 
   await salvarAgendaDia(dow, horarios);
+  revalidateTag("agenda-semanal", {});
   return NextResponse.json(await getAgendaSemanal());
 }

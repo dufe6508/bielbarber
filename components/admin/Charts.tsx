@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
-const COR = "var(--primary)";
+const COR = "var(--chart-1)";
 const GRID = "var(--border)";
 const EIXO = "var(--muted-foreground)";
 
@@ -135,6 +135,47 @@ export function ReceitaBarChart({ dados }: { dados: DiaReceita[] }) {
   );
 }
 
+// Fluxo de caixa por dia — entradas vs saídas (barras agrupadas, mono).
+export function FluxoCaixaChart({
+  dados,
+}: {
+  dados: { dia: string; entradas: number; saidas: number }[];
+}) {
+  const max = Math.max(0, ...dados.map((d) => Math.max(d.entradas, d.saidas)));
+  if (max === 0)
+    return (
+      <p className="py-12 text-center text-sm text-muted-foreground">
+        Sem movimento no período.
+      </p>
+    );
+  return (
+    <ResponsiveContainer width="100%" height={210}>
+      <BarChart data={dados} margin={{ top: 8, right: 4, left: -14, bottom: 0 }} barCategoryGap="22%">
+        <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
+        <XAxis
+          dataKey="dia"
+          tickFormatter={rotuloDia}
+          tick={{ fontSize: 10, fill: EIXO }}
+          tickLine={false}
+          axisLine={false}
+          minTickGap={28}
+        />
+        <YAxis
+          tickFormatter={moedaCurta}
+          tick={{ fontSize: 10, fill: EIXO }}
+          tickLine={false}
+          axisLine={false}
+          width={46}
+          tickCount={4}
+        />
+        <Tooltip content={<TooltipBox moeda />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
+        <Bar dataKey="entradas" name="Entradas" fill={COR} radius={[3, 3, 0, 0]} maxBarSize={12} />
+        <Bar dataKey="saidas" name="Saídas" fill="oklch(0.52 0.17 26)" radius={[3, 3, 0, 0]} maxBarSize={12} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 // Barras horizontais: ranking (serviços mais vendidos).
 export function RankingBarChart({
   dados,
@@ -167,7 +208,7 @@ export function RankingBarChart({
         <Tooltip content={<TooltipBox />} cursor={{ fill: "var(--muted)" }} />
         <Bar dataKey="total" name="Vendas" radius={[0, 6, 6, 0]}>
           {dados.map((_, i) => (
-            <Cell key={i} fill={COR} fillOpacity={1 - i * 0.1} />
+            <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />
           ))}
         </Bar>
       </BarChart>

@@ -39,6 +39,8 @@ export async function GET(
       status: a.status,
       statusPagamento: a.statusPagamento,
       valorTotal: a.valorTotal,
+      rating: a.rating,
+      checkinEm: a.checkinEm,
       servicos: a.servicos.map((s) => ({
         nome: s.servico.nome,
         preco: s.precoNaHora,

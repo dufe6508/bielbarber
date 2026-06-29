@@ -10,7 +10,7 @@ import {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
 
-  if (!verificarSenha(body?.senha)) {
+  if (!(await verificarSenha(body?.senha))) {
     // Pequeno atraso constante desencoraja brute-force por timing/loop.
     await new Promise((r) => setTimeout(r, 350));
     return NextResponse.json({ error: "Senha incorreta" }, { status: 401 });

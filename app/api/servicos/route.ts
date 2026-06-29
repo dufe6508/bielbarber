@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { cachedServicos } from "@/lib/cache";
 
 export async function GET() {
-  const servicos = await prisma.service.findMany({
-    where: { ativo: true },
-    orderBy: { nome: "asc" },
-  });
+  const servicos = await cachedServicos();
   return NextResponse.json(servicos);
 }

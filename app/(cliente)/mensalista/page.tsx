@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Search, Loader2, Wallet, CalendarClock, Scissors } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PagamentoDrawer } from "@/components/PagamentoDrawer";
@@ -51,6 +51,7 @@ export default function MensalistaPage() {
   useEffect(() => {
     const t = telefoneLembrado();
     if (t) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill do telefone lembrado no mount
       setTelefone(formatarTelefone(t));
       busca.mutate(t);
     }

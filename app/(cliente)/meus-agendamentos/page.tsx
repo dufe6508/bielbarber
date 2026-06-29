@@ -6,7 +6,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
   Loader2,
@@ -16,9 +16,13 @@ import {
   X,
   Scissors,
   Award,
+  Star,
+  MapPin,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
+import { RatingDrawer } from "@/components/RatingDrawer";
 import { Input } from "@/components/ui/input";
 import {
   formatarTelefone,
@@ -38,6 +42,8 @@ type Agendamento = {
   status: "agendado" | "concluido" | "cancelado" | "nao_compareceu";
   valorTotal: string;
   servicos: Servico[];
+  rating: number | null;
+  checkinEm: string | null;
 };
 type Resultado = { nome: string; agendamentos: Agendamento[] };
 
@@ -52,6 +58,11 @@ type Visual = {
 
 function capitalizar(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Mesmo dia (local) — libera o botão "Cheguei!"
+function ehHoje(data: string): boolean {
+  return rotuloRelativo(data) === "Hoje";
 }
 
 // true quando a data é Hoje ou Amanhã (mostra chip de destaque)
@@ -110,6 +121,7 @@ export default function MeusAgendamentosPage() {
   useEffect(() => {
     const t = telefoneLembrado();
     if (t) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill do telefone lembrado no mount
       setTelefone(formatarTelefone(t));
       setConsultado(t);
     }
@@ -234,6 +246,25 @@ function CartaoAgendamento({
 }) {
   const v = visualDe(a);
   const [remarcando, setRemarcando] = useState(false);
+  const [avaliando, setAvaliando] = useState(false);
+
+  const checkin = useMutation<unknown, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch(`/api/agendamentos/${a.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "checkin" }),
+      });
+      const dados = await res.json();
+      if (!res.ok) throw new Error(dados.error ?? "Erro no check-in.");
+      return dados;
+    },
+    onSuccess: () => {
+      toast.success("Check-in feito. O Biel já sabe que você chegou!");
+      onMudou();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const cancelar = useMutation<unknown, Error, void>({
     mutationFn: async () => {
@@ -346,6 +377,67 @@ function CartaoAgendamento({
             Alterações encerradas (menos de 1h para o horário).
           </p>
         )}
+
+        {/* Check-in digital — só no dia, enquanto agendado */}
+        {v.ativo &&
+          ehHoje(a.data) &&
+          (a.checkinEm ? (
+            <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-success-muted-foreground">
+              <CheckCircle2 className="size-4" />
+              Check-in feito
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => checkin.mutate()}
+              disabled={checkin.isPending}
+              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-[transform,filter] hover:brightness-[1.10] active:scale-[0.98] disabled:opacity-50"
+            >
+              {checkin.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <MapPin className="size-4" />
+              )}
+              Cheguei!
+            </button>
+          ))}
+
+        {/* Avaliação pós-corte — só para concluídos */}
+        {a.status === "concluido" &&
+          (a.rating ? (
+            <div className="mt-3 flex items-center gap-1 border-t border-dashed border-border pt-3">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Star
+                  key={n}
+                  className={cn(
+                    "size-4",
+                    n <= a.rating!
+                      ? "fill-primary text-primary"
+                      : "text-muted-foreground/30"
+                  )}
+                />
+              ))}
+              <span className="ml-1 text-xs text-muted-foreground">
+                Você avaliou
+              </span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAvaliando(true)}
+              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+            >
+              <Star className="size-4" />
+              Avaliar este corte
+            </button>
+          ))}
+
+        <RatingDrawer
+          open={avaliando}
+          onOpenChange={setAvaliando}
+          agendamentoId={a.id}
+          onAvaliado={() => onMudou()}
+        />
 
         {/* Remarcar — inline */}
         <AnimatePresence>

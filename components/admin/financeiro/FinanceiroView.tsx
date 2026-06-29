@@ -16,9 +16,11 @@ import {
   Gauge,
   Loader2,
   ChevronRight,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 import { ReceitaBarChart, MiniBarChart } from "@/components/admin/Charts";
+import { ContabilidadeView } from "@/components/admin/financeiro/ContabilidadeView";
 import { AdminModal } from "@/components/admin/AdminModal";
 import { formatarPreco, formatarTelefone } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -73,6 +75,7 @@ function CountUp({
   const [n, setN] = useState(0);
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sem animação: aplica valor final
       setN(value);
       return;
     }
@@ -101,10 +104,13 @@ const fadeUp = {
 const TABS = [
   { id: "resumo", label: "Resumo" },
   { id: "insights", label: "Insights" },
+  { id: "contabilidade", label: "Contabilidade" },
 ] as const;
 
+type TabId = (typeof TABS)[number]["id"];
+
 export function FinanceiroView(props: FinanceiroViewProps) {
-  const [tab, setTab] = useState<"resumo" | "insights">("resumo");
+  const [tab, setTab] = useState<TabId>("resumo");
   const [tipo, setTipo] = useState<string | null>(null);
   const [detalhe, setDetalhe] = useState<{
     titulo: string;
@@ -125,10 +131,18 @@ export function FinanceiroView(props: FinanceiroViewProps) {
     }
   }
 
+  // Intervalo do mês (YYYY-MM) → ?de=…&ate=… para a exportação CSV.
+  const [ano, mesNum] = props.mes.split("-").map(Number);
+  const de = `${props.mes}-01`;
+  const ultimoDia = new Date(ano, mesNum, 0).getDate();
+  const ate = `${props.mes}-${String(ultimoDia).padStart(2, "0")}`;
+  const exportHref = `/api/admin/financeiro/export?de=${de}&ate=${ate}`;
+
   return (
     <div>
-      {/* Segmented control */}
-      <div className="relative mb-5 inline-flex rounded-full border border-border bg-muted/50 p-1">
+      {/* Segmented control + exportar */}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="relative inline-flex rounded-full border border-border bg-muted/50 p-1">
         {TABS.map((t) => {
           const ativo = tab === t.id;
           return (
@@ -153,28 +167,32 @@ export function FinanceiroView(props: FinanceiroViewProps) {
         })}
       </div>
 
+        <a
+          href={exportHref}
+          download
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground shadow-xs transition-all hover:border-primary/40 hover:text-foreground active:scale-95"
+        >
+          <Download className="size-4" />
+          Exportar CSV
+        </a>
+      </div>
+
       <AnimatePresence mode="wait">
-        {tab === "resumo" ? (
-          <motion.div
-            key="resumo"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2 }}
+        >
+          {tab === "resumo" ? (
             <ResumoTab {...props} abrir={abrir} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="insights"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
+          ) : tab === "insights" ? (
             <InsightsTab {...props} abrir={abrir} />
-          </motion.div>
-        )}
+          ) : (
+            <ContabilidadeView mes={props.mes} />
+          )}
+        </motion.div>
       </AnimatePresence>
 
       <AdminModal

@@ -7,6 +7,8 @@ import {
   BadgeCheck,
   Users,
   Wallet,
+  Images,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -21,11 +23,14 @@ export const navAdmin: ItemNavAdmin[] = [
   { href: "/admin", rotulo: "Visão geral", icone: LayoutDashboard },
   { href: "/admin/agenda", rotulo: "Agenda", icone: CalendarDays },
   { href: "/admin/agendamentos", rotulo: "Agendamentos", icone: BadgeCheck },
+  { href: "/admin/clientes", rotulo: "Clientes", icone: Users },
   { href: "/admin/servicos", rotulo: "Serviços", icone: Scissors },
   { href: "/admin/produtos", rotulo: "Loja", icone: ShoppingBag },
+  { href: "/admin/galeria", rotulo: "Galeria", icone: Images },
   { href: "/admin/pacotes", rotulo: "Assinaturas", icone: Crown },
   { href: "/admin/mensalistas", rotulo: "Mensalistas", icone: Users },
   { href: "/admin/financeiro", rotulo: "Financeiro", icone: Wallet },
+  { href: "/admin/configuracoes", rotulo: "Configurações", icone: Settings },
 ];
 
 export function rotaAtivaAdmin(pathname: string, href: string): boolean {

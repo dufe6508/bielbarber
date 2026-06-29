@@ -13,7 +13,7 @@ export function AdminTabs({
 
   return (
     <div>
-      <div className="mb-6 flex gap-1 border-b border-border">
+      <div className="mb-6 flex justify-center gap-1 border-b border-border">
         {abas.map((aba) => {
           const on = aba.id === ativa;
           return (

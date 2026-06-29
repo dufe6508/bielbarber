@@ -101,8 +101,8 @@ export function StatCard({
           className={cn(
             "mt-0.5 flex items-center gap-1 text-[11px]",
             destaque && "text-primary-foreground/75",
-            !destaque && tom === "positivo" && "text-emerald-600 dark:text-emerald-400",
-            !destaque && tom === "alerta" && "text-amber-600 dark:text-amber-400",
+            !destaque && tom === "positivo" && "text-success-muted-foreground",
+            !destaque && tom === "alerta" && "text-danger-muted-foreground",
             !destaque && tom === "neutro" && "text-muted-foreground"
           )}
         >
@@ -181,11 +181,11 @@ export function Pill({
   tom?: "neutro" | "verde" | "amber" | "vermelho" | "azul";
 }) {
   const tons: Record<string, string> = {
-    neutro: "bg-muted text-muted-foreground",
-    verde: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
-    amber: "bg-amber-500/12 text-amber-700 dark:text-amber-400",
-    vermelho: "bg-red-500/12 text-red-700 dark:text-red-400",
-    azul: "bg-blue-500/12 text-blue-700 dark:text-blue-400",
+    neutro: "bg-neutral-muted text-neutral-muted-foreground",
+    verde: "bg-success-muted text-success-muted-foreground",
+    amber: "bg-danger-muted text-danger-muted-foreground",
+    vermelho: "bg-danger-muted text-danger-muted-foreground",
+    azul: "bg-primary/15 text-primary dark:text-primary-foreground",
   };
   return (
     <span

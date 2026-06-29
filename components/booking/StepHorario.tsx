@@ -2,23 +2,30 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
+  BellPlus,
   CalendarOff,
   CalendarRange,
+  Check,
   ChevronLeft,
   ChevronRight,
   Layers,
+  Loader2,
   Moon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useBooking } from "@/lib/store/booking";
 import {
   dataISOLocal,
+  formatarData,
+  formatarTelefone,
   nomeMesAno,
   rotuloRelativo,
+  telefoneNumeros,
 } from "@/lib/utils/format";
 import { slotsQueryOptions, prefetchSlots } from "@/lib/queries/slots";
+import { proximaHora } from "@/lib/utils/horarios";
 import { cn } from "@/lib/utils";
 import { CalendarSheet } from "./CalendarSheet";
 
@@ -51,12 +58,6 @@ function proximosDias(qtd: number): Date[] {
     cursor.setDate(cursor.getDate() + 1);
   }
   return dias;
-}
-
-// "HH:00" → próxima hora "HH+1:00"
-function proximaHora(h: string): string {
-  const hora = Number(h.split(":")[0]);
-  return `${String(hora + 1).padStart(2, "0")}:00`;
 }
 
 // Agrupa horários por período do dia — dá estrutura à grade
@@ -423,6 +424,7 @@ export function StepHorario() {
                 : "Este dia já está cheio ou ainda não foi aberto. Tente um dia diferente."}
             </p>
           </div>
+          {!diaFechado && data && <WaitlistCTA data={data} />}
         </motion.div>
       )}
 
@@ -433,5 +435,95 @@ export function StepHorario() {
         onSelect={(iso) => selecionarData(iso)}
       />
     </div>
+  );
+}
+
+// Fila de espera: dia cheio → cliente deixa nome+telefone e é avisado se liberar.
+function WaitlistCTA({ data }: { data: string }) {
+  const { nome: nomeStore, telefone: telStore, setNome, setTelefone } = useBooking();
+  const [aberto, setAberto] = useState(false);
+  const [nome, setNomeLocal] = useState(nomeStore);
+  const [tel, setTel] = useState(telStore);
+  const [enviando, setEnviando] = useState(false);
+  const [feito, setFeito] = useState(false);
+
+  async function entrar(e: React.FormEvent) {
+    e.preventDefault();
+    if (nome.trim().length < 2 || telefoneNumeros(tel).length < 10) return;
+    setEnviando(true);
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: nome.trim(),
+          telefone: telefoneNumeros(tel),
+          data,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      // Reaproveita os dados no resto do fluxo
+      setNome(nome.trim());
+      setTelefone(formatarTelefone(tel));
+      setFeito(true);
+    } catch {
+      toast.error("Não foi possível entrar na fila. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  if (feito) {
+    return (
+      <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <Check className="size-4 text-primary" strokeWidth={2.5} />
+        Pronto! Avisamos se liberar um horário em {formatarData(data)}.
+      </p>
+    );
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-muted"
+      >
+        <BellPlus className="size-3.5" aria-hidden="true" />
+        Me avise se liberar
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={entrar} className="w-full max-w-xs space-y-2">
+      <input
+        type="text"
+        placeholder="Seu nome"
+        value={nome}
+        onChange={(e) => setNomeLocal(e.target.value)}
+        className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+      />
+      <input
+        type="tel"
+        inputMode="numeric"
+        placeholder="(31) 99999-9999"
+        value={tel}
+        onChange={(e) => setTel(formatarTelefone(e.target.value))}
+        className="h-11 w-full rounded-lg border border-input bg-background px-3 font-mono text-base tabular-nums outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+      />
+      <button
+        type="submit"
+        disabled={
+          nome.trim().length < 2 ||
+          telefoneNumeros(tel).length < 10 ||
+          enviando
+        }
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-40"
+      >
+        {enviando && <Loader2 className="size-4 animate-spin" />}
+        Entrar na fila
+      </button>
+    </form>
   );
 }

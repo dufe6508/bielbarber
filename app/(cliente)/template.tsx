@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 // Transição suave entre páginas do cliente (só opacity — não quebra sticky/fixed)
 export default function Template({ children }: { children: React.ReactNode }) {

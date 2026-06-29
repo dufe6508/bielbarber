@@ -33,8 +33,8 @@
   /* Tokens customizados (mono-acento onyx) */
   --color-destaque:            var(--destaque);
   --color-destaque-foreground: var(--destaque-foreground);
-  --color-dourado:             var(--dourado);
-  --color-dourado-foreground:  var(--dourado-foreground);
+  --color-destaque:            var(--destaque);
+  --color-destaque-foreground: var(--destaque-foreground);
 
   /* Card selecionado — YInMn Blue (#31487A), funciona em light e dark */
   --color-card-selected:            var(--card-selected);
@@ -149,8 +149,8 @@
   /* Mono-acento: onyx. Tom secundário = grafite mais claro */
   --destaque:            oklch(0.232 0.006 265);
   --destaque-foreground: oklch(0.985 0.001 258);
-  --dourado:             oklch(0.380 0.006 265);
-  --dourado-foreground:  oklch(0.985 0.001 258);
+  --destaque:            oklch(0.232 0.006 265);
+  --destaque-foreground: oklch(0.985 0.001 258);
 
   /* ─── Status semânticos — calibrados ao sistema (menos saturados) ──────── */
   --success:                  oklch(0.505 0.115 145);
@@ -244,8 +244,8 @@
   /* Mono-acento — prata onyx */
   --destaque:            oklch(0.860 0.004 258);
   --destaque-foreground: oklch(0.118 0.004 258);
-  --dourado:             oklch(0.780 0.004 258);
-  --dourado-foreground:  oklch(0.118 0.004 258);
+  --destaque:            oklch(0.860 0.004 258);
+  --destaque-foreground: oklch(0.118 0.004 258);
 
   /* ── Status semânticos — dark ────────────────────────────────────────── */
   --success:                  oklch(0.648 0.112 145);

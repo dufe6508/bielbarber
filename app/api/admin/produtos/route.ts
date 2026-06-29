@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { slugUnico } from "@/lib/slugify";
 
 // GET — todos os produtos (inclui inativos).
 export async function GET() {
@@ -22,9 +24,13 @@ export async function POST(request: Request) {
   if (!b?.nome || typeof b.preco !== "number") {
     return NextResponse.json({ error: "Nome e preço são obrigatórios" }, { status: 400 });
   }
+  const slug = await slugUnico(b.nome, async (s) =>
+    !!(await prisma.product.findUnique({ where: { slug: s }, select: { id: true } }))
+  );
   const produto = await prisma.product.create({
     data: {
       nome: String(b.nome).slice(0, 80),
+      slug,
       descricao: b.descricao ? String(b.descricao).slice(0, 300) : null,
       preco: b.preco,
       precoAntigo:
@@ -38,5 +44,6 @@ export async function POST(request: Request) {
       ordem: Number(b.ordem) || 0,
     },
   });
+  revalidateTag("produtos", {});
   return NextResponse.json(produto, { status: 201 });
 }

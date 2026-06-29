@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { slugUnico } from "@/lib/slugify";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,15 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (!b) return NextResponse.json({ error: "Body inválido" }, { status: 400 });
 
   const data: Record<string, unknown> = {};
-  if (b.nome !== undefined) data.nome = String(b.nome).slice(0, 80);
+  if (b.nome !== undefined) {
+    data.nome = String(b.nome).slice(0, 80);
+    data.slug = await slugUnico(b.nome, async (s) =>
+      !!(await prisma.package.findFirst({
+        where: { slug: s, NOT: { id } },
+        select: { id: true },
+      }))
+    );
+  }
   if (b.descricao !== undefined)
     data.descricao = b.descricao ? String(b.descricao).slice(0, 300) : null;
   if (b.tipo !== undefined) data.tipo = b.tipo === "quantidade" ? "quantidade" : "combo";

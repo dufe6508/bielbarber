@@ -3,17 +3,19 @@ import { SidebarNav } from "@/components/SidebarNav";
 import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { getGaleriaVisivel } from "@/lib/utils/slots";
 
-export default function ClienteLayout({
+export default async function ClienteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const galeriaVisivel = await getGaleriaVisivel();
   return (
     <QueryProvider>
       <div className="flex min-h-[100dvh] w-full">
         {/* Desktop: navegação lateral */}
-        <SidebarNav />
+        <SidebarNav galeriaVisivel={galeriaVisivel} />
 
         {/* Coluna principal */}
         <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
@@ -29,7 +31,7 @@ export default function ClienteLayout({
           </main>
 
           {/* Mobile: navegação inferior */}
-          <BottomNav />
+          <BottomNav galeriaVisivel={galeriaVisivel} />
         </div>
       </div>
     </QueryProvider>

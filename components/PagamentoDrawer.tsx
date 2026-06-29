@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Drawer } from "vaul";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { QrCode, CreditCard, Check, Copy, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { formatarPreco } from "@/lib/utils/format";

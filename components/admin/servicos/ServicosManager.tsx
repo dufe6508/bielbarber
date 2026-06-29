@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Loader2, Pencil, Plus, Power, Trash2, Users, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { AdminModal, Campo, inputCls } from "@/components/admin/AdminModal";

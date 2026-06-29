@@ -45,6 +45,9 @@ type BookingState = {
   irPara: (p: number) => void;
   reset: () => void;
 
+  // Pré-seleciona serviços e vai pro passo de horário ("Repetir Último Corte" / deep link).
+  preselecionar: (servicos: ServicoSelecionado[]) => void;
+
   valorTotal: () => number;
   slotsNecessarios: () => number; // maior exigência entre os serviços (1 ou 2)
 };
@@ -95,6 +98,9 @@ export const useBooking = create<BookingState>((set, get) => ({
   voltar: () => set((s) => ({ passo: Math.max(s.passo - 1, 0) })),
   irPara: (passo) => set({ passo }),
   reset: () => set(estadoInicial),
+
+  preselecionar: (servicos) =>
+    set({ servicos, data: null, horario: null, horarioFim: null, passo: 0 }),
 
   valorTotal: () => {
     const s = get().servicos.reduce((acc, x) => acc + x.preco, 0);

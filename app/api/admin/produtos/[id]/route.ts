@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { slugUnico } from "@/lib/slugify";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,7 +16,15 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (!b) return NextResponse.json({ error: "Body inválido" }, { status: 400 });
 
   const data: Record<string, unknown> = {};
-  if (b.nome !== undefined) data.nome = String(b.nome).slice(0, 80);
+  if (b.nome !== undefined) {
+    data.nome = String(b.nome).slice(0, 80);
+    data.slug = await slugUnico(b.nome, async (s) =>
+      !!(await prisma.product.findFirst({
+        where: { slug: s, NOT: { id } },
+        select: { id: true },
+      }))
+    );
+  }
   if (b.descricao !== undefined)
     data.descricao = b.descricao ? String(b.descricao).slice(0, 300) : null;
   if (b.preco !== undefined) data.preco = Number(b.preco);
@@ -33,6 +43,7 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (b.ordem !== undefined) data.ordem = Number(b.ordem);
 
   const produto = await prisma.product.update({ where: { id }, data });
+  revalidateTag("produtos", {});
   return NextResponse.json(produto);
 }
 
@@ -48,8 +59,10 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   });
   if (emUso) {
     await prisma.product.update({ where: { id }, data: { ativo: false } });
+    revalidateTag("produtos", {});
     return NextResponse.json({ ok: true, desativado: true });
   }
   await prisma.product.delete({ where: { id } }).catch(() => null);
+  revalidateTag("produtos", {});
   return NextResponse.json({ ok: true });
 }

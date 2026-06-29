@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft, ArrowRight, Check, Loader2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useBooking } from "@/lib/store/booking";
+import { ativarPush } from "@/lib/notifications/subscribe-client";
 import { formatarPreco, telefoneNumeros } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { StepServicos } from "./StepServicos";
@@ -27,6 +28,46 @@ export function BookingStepper() {
   const { passo, avancar, voltar, irPara } = booking;
   const [enviando, setEnviando] = useState(false);
   const [codigo, setCodigo] = useState<string | null>(null);
+  const [bloqueado, setBloqueado] = useState(false);
+  const { preselecionar } = booking;
+
+  // Deep link: /?servico=<slug|id> → pré-seleciona o serviço e pula pro horário.
+  // Contrato com Agent A: páginas /agendar/[slug] redirecionam para /?servico=<slug>.
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get("servico");
+    if (!slug) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/servicos");
+        if (!res.ok) return;
+        const lista: {
+          id: string;
+          slug: string | null;
+          nome: string;
+          preco: string;
+          slotsNecessarios?: number;
+        }[] = await res.json();
+        const s = lista.find((x) => x.slug === slug || x.id === slug);
+        if (s && !cancelado) {
+          preselecionar([
+            {
+              id: s.id,
+              nome: s.nome,
+              preco: Number(s.preco),
+              slotsNecessarios: s.slotsNecessarios,
+            },
+          ]);
+        }
+      } catch {
+        /* deep link inválido — segue fluxo normal */
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function podeAvancar(): boolean {
     switch (passo) {
@@ -76,17 +117,60 @@ export function BookingStepper() {
 
       const dados = await res.json();
       if (!res.ok) {
+        // Telefone bloqueado → tela dedicada (não expõe o motivo)
+        if (res.status === 403 && dados.bloqueado) {
+          setBloqueado(true);
+          return;
+        }
         toast.error(dados.error ?? "Não foi possível agendar. Tente de novo.");
         return;
       }
 
       setCodigo(dados.codigo);
+      // Push best-effort: pede permissão e registra a assinatura sem travar o fluxo.
+      void ativarPush(telefoneNumeros(booking.telefone));
       avancar();
     } catch {
       toast.error("Erro de conexão. Verifique sua internet.");
     } finally {
       setEnviando(false);
     }
+  }
+
+  // Telefone bloqueado — tela calma, sem expor o motivo
+  if (bloqueado) {
+    // ponytail: número placeholder — trocar pelo WhatsApp real da barbearia
+    const WHATSAPP = "5531999999999";
+    return (
+      <div className="mx-auto w-full max-w-md px-5 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+          className="rounded-2xl border border-border bg-card p-8 text-center"
+        >
+          <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <MessageCircle className="size-7" />
+          </span>
+          <h1 className="mt-5 font-heading text-2xl font-semibold tracking-tight text-foreground">
+            Não foi possível concluir
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Houve um problema com este agendamento. Fale com a barbearia pelo
+            WhatsApp para resolver.
+          </p>
+          <a
+            href={`https://wa.me/${WHATSAPP}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-[transform,filter] hover:brightness-[1.10] active:scale-[0.98]"
+          >
+            <MessageCircle className="size-4" />
+            Falar no WhatsApp
+          </a>
+        </motion.div>
+      </div>
+    );
   }
 
   // Tela final — ticket

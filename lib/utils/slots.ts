@@ -1,49 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import {
+  GRADE_HORARIOS,
+  horariosPadraoDoDia,
+  diaDaSemana,
+  proximaHora,
+} from "@/lib/utils/horarios";
 
-// Hora do almoço — excluída dos horários padrão (o barbeiro pode reabrir no painel).
-const HORA_ALMOCO = 12;
-
-// Faixa padrão de funcionamento por dia da semana (0=dom ... 6=sáb).
-// É só o ponto de partida: o barbeiro edita os horários abertos no painel.
-// Dom (0) e seg (1) nascem fechados (folga). Sem linha no banco = usa este padrão.
-const FAIXA_PADRAO: Record<number, { inicio: number; fim: number } | null> = {
-  0: null, // domingo
-  1: null, // segunda
-  2: { inicio: 9, fim: 20 }, // terça
-  3: { inicio: 9, fim: 20 }, // quarta
-  4: { inicio: 9, fim: 20 }, // quinta
-  5: { inicio: 14, fim: 22 }, // sexta
-  6: { inicio: 9, fim: 20 }, // sábado
-};
-
-// Grade completa de horas que o painel mostra para abrir/fechar (08:00–22:00).
-export const GRADE_HORARIOS: string[] = Array.from({ length: 15 }, (_, i) =>
-  `${String(8 + i).padStart(2, "0")}:00`
-);
-
-// Horários abertos por padrão num dia da semana (antes de qualquer edição do barbeiro).
-export function horariosPadraoDoDia(dow: number): string[] {
-  const faixa = FAIXA_PADRAO[dow];
-  if (!faixa) return [];
-  const horas: string[] = [];
-  for (let h = faixa.inicio; h <= faixa.fim; h++) {
-    if (h === HORA_ALMOCO) continue;
-    horas.push(`${String(h).padStart(2, "0")}:00`);
-  }
-  return horas;
-}
-
-// Dia da semana a partir de "YYYY-MM-DD" no fuso local (evita o shift de UTC).
-function diaDaSemana(data: string): number {
-  const [ano, mes, dia] = data.split("-").map(Number);
-  return new Date(ano, mes - 1, dia).getDay();
-}
-
-// "HH:00" → próxima hora "HH+1:00"
-export function proximaHora(h: string): string {
-  const hora = Number(h.split(":")[0]);
-  return `${String(hora + 1).padStart(2, "0")}:00`;
-}
+// Re-exporta os helpers puros para manter os imports existentes funcionando.
+export { GRADE_HORARIOS, horariosPadraoDoDia, proximaHora };
 
 // Horários abertos de um dia da semana: linha salva pelo barbeiro tem prioridade;
 // sem linha, cai no padrão (ter–sáb cheios, dom/seg vazios).
@@ -109,6 +73,82 @@ export async function setHorizonteDias(dias: number): Promise<void> {
   });
 }
 
+// ─── Visibilidade da galeria ───────────────────────────────────────────────
+// Liga/desliga a aba "Galeria" para o cliente. Guardado em `configuracoes`.
+const CHAVE_GALERIA = "galeria_visivel";
+
+export async function getGaleriaVisivel(): Promise<boolean> {
+  const linha = await prisma.setting.findUnique({
+    where: { chave: CHAVE_GALERIA },
+  });
+  // Padrão: visível (só esconde quando explicitamente "false").
+  return linha?.valor !== "false";
+}
+
+export async function setGaleriaVisivel(visivel: boolean): Promise<void> {
+  const valor = visivel ? "true" : "false";
+  await prisma.setting.upsert({
+    where: { chave: CHAVE_GALERIA },
+    update: { valor },
+    create: { chave: CHAVE_GALERIA, valor },
+  });
+}
+
+// ─── Cartão fidelidade ─────────────────────────────────────────────────────
+// Meta de carimbos e recompensa, guardados em `configuracoes` (key/value).
+const CHAVE_FID_META = "fidelidade_meta";
+const CHAVE_FID_RECOMPENSA = "fidelidade_recompensa";
+const FID_META_PADRAO = 10;
+const FID_RECOMPENSA_PADRAO = "Corte grátis";
+
+export type Fidelidade = { fidelidadeMeta: number; fidelidadeRecompensa: string };
+
+export async function getFidelidade(): Promise<Fidelidade> {
+  const linhas = await prisma.setting.findMany({
+    where: { chave: { in: [CHAVE_FID_META, CHAVE_FID_RECOMPENSA] } },
+  });
+  const meta = linhas.find((l) => l.chave === CHAVE_FID_META)?.valor;
+  const recompensa = linhas.find((l) => l.chave === CHAVE_FID_RECOMPENSA)?.valor;
+  const n = meta ? parseInt(meta, 10) : NaN;
+  return {
+    fidelidadeMeta: Number.isFinite(n) && n > 0 ? n : FID_META_PADRAO,
+    fidelidadeRecompensa: recompensa || FID_RECOMPENSA_PADRAO,
+  };
+}
+
+// Lê só a meta — usado pela lógica de incremento de carimbos no admin.
+export async function getFidelidadeMeta(): Promise<number> {
+  return (await getFidelidade()).fidelidadeMeta;
+}
+
+export async function setFidelidade(opts: {
+  meta?: number;
+  recompensa?: string;
+}): Promise<void> {
+  const ops = [];
+  if (typeof opts.meta === "number") {
+    const valor = String(Math.max(1, Math.min(100, Math.round(opts.meta))));
+    ops.push(
+      prisma.setting.upsert({
+        where: { chave: CHAVE_FID_META },
+        update: { valor },
+        create: { chave: CHAVE_FID_META, valor },
+      })
+    );
+  }
+  if (typeof opts.recompensa === "string") {
+    const valor = opts.recompensa.slice(0, 80);
+    ops.push(
+      prisma.setting.upsert({
+        where: { chave: CHAVE_FID_RECOMPENSA },
+        update: { valor },
+        create: { chave: CHAVE_FID_RECOMPENSA, valor },
+      })
+    );
+  }
+  await Promise.all(ops);
+}
+
 // "YYYY-MM-DD" → true se está além do horizonte (cliente não pode marcar).
 export async function foraDoHorizonte(data: string): Promise<boolean> {
   const dias = await getHorizonteDias();
@@ -166,5 +206,6 @@ export async function getSlotsDisponiveis(data: string): Promise<string[]> {
     horariosOcupados.add(a.horarioInicio);
     if (a.slots >= 2) horariosOcupados.add(proximaHora(a.horarioInicio));
   }
+
   return base.filter((slot) => !horariosOcupados.has(slot));
 }

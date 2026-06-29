@@ -10,6 +10,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- guarda de hidratação do next-themes
   useEffect(() => setMounted(true), []);
 
   if (!mounted) return <span className="size-7 shrink-0" />;

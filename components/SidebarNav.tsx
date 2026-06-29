@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MapPin, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, ChevronRight } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { navCliente, rotaAtiva } from "@/lib/nav";
+import { navClienteVisivel, rotaAtiva } from "@/lib/nav";
 import { Logo } from "@/components/Logo";
 import { AdminSecretLogo } from "@/components/AdminSecretLogo";
 import { cn } from "@/lib/utils";
@@ -49,9 +49,10 @@ const SOLID_STYLE: React.CSSProperties = {
   WebkitBackdropFilter: "none",
 };
 
-export function SidebarNav() {
+export function SidebarNav({ galeriaVisivel = true }: { galeriaVisivel?: boolean }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const itens = navClienteVisivel(galeriaVisivel);
 
   return (
     <motion.aside
@@ -174,7 +175,7 @@ export function SidebarNav() {
 
       {/* ── Nav items ──────────────────────────────────────────── */}
       <nav className="relative z-10 flex flex-1 flex-col gap-0.5 px-2 py-3">
-        {navCliente.map((item) => {
+        {itens.map((item) => {
           const Icone = item.icone;
           const ativo = rotaAtiva(pathname, item.href);
           return (

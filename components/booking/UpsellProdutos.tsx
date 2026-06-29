@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { Plus, Minus, Sparkles, Package as PackageIcon } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
 import { formatarPreco } from "@/lib/utils/format";

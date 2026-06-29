@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSlotsDisponiveis } from "@/lib/utils/slots";
+import { cachedSlots } from "@/lib/cache";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,6 +12,6 @@ export async function GET(request: Request) {
     );
   }
 
-  const slots = await getSlotsDisponiveis(data);
+  const slots = await cachedSlots(data);
   return NextResponse.json(slots);
 }

@@ -7,7 +7,7 @@ import {
   motion,
   useReducedMotion,
   type Variants,
-} from "framer-motion";
+} from "motion/react";
 import {
   Minus,
   Plus,
@@ -35,6 +35,7 @@ export default function LojaPage() {
   const [carrinho, setCarrinho] = useState<Record<string, number>>({});
   const [voos, setVoos] = useState<Voo[]>([]);
   const carrinhoRef = useRef<HTMLSpanElement>(null);
+  const vooSeq = useRef(0);
   const reduzir = useReducedMotion();
 
   const gridVariants: Variants = {
@@ -84,7 +85,7 @@ export default function LojaPage() {
     const tx = alvo ? alvo.left + alvo.width / 2 : window.innerWidth * 0.14;
     const ty = alvo ? alvo.top + alvo.height / 2 : window.innerHeight - 64;
 
-    const key = Date.now() + Math.random();
+    const key = ++vooSeq.current;
     setVoos((v) => [...v, { key, x, y, tx, ty, img: p.urlImagem }]);
     window.setTimeout(() => setVoos((v) => v.filter((it) => it.key !== key)), 720);
   }

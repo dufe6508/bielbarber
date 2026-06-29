@@ -53,14 +53,15 @@ export type ResumoReceita = {
   ticketMedio: number;
 };
 
-// Receita de uma janela [desde, ate).
+// Receita de uma janela [desde, ate). Usa data do corte (não criadoEm) — consistente com receitaPorFonte.
 export async function receitaNoPeriodo(
   desde: Date,
   ate: Date = new Date()
 ): Promise<ResumoReceita> {
+  const jd = janelaData(desde);
   const [ags, pedidos] = await Promise.all([
     prisma.appointment.findMany({
-      where: { status: "concluido", criadoEm: { gte: desde, lt: ate } },
+      where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
       select: { valorTotal: true },
     }),
     prisma.order.findMany({
@@ -137,7 +138,7 @@ export type ResumoAtendimento = {
 
 export async function atendimentoNoPeriodo(
   desde: Date,
-  ate: Date = new Date()
+  _ate: Date = new Date()
 ): Promise<ResumoAtendimento> {
   const jd = janelaData(desde);
   const ags = await prisma.appointment.groupBy({
@@ -212,6 +213,19 @@ export async function novosClientes(desde: Date, ate: Date): Promise<number> {
   return prisma.client.count({ where: { criadoEm: { gte: desde, lt: ate } } });
 }
 
+// Clientes ativos = marcaram pelo menos um horário (não cancelado) nos últimos
+// 2 meses corridos. Distinct por cliente.
+export async function clientesAtivos(meses = 2): Promise<number> {
+  const desde = new Date();
+  desde.setMonth(desde.getMonth() - meses);
+  desde.setHours(0, 0, 0, 0);
+  const grupos = await prisma.appointment.groupBy({
+    by: ["clienteId"],
+    where: { status: { not: "cancelado" }, data: { gte: desde } },
+  });
+  return grupos.length;
+}
+
 // Próximos atendimentos agendados (de hoje em diante).
 export async function proximosAtendimentos(limite = 5): Promise<
   {
@@ -244,58 +258,17 @@ export async function proximosAtendimentos(limite = 5): Promise<
   }));
 }
 
-// Série de receita por dia nos últimos N dias (para gráfico de linha/área).
-export async function serieReceitaDiaria(
-  dias = 30
-): Promise<{ data: string; servicos: number; loja: number }[]> {
-  const desde = new Date();
-  desde.setHours(0, 0, 0, 0);
-  desde.setDate(desde.getDate() - (dias - 1));
 
-  const [ags, pedidos] = await Promise.all([
-    prisma.appointment.findMany({
-      where: { status: "concluido", criadoEm: { gte: desde } },
-      select: { criadoEm: true, valorTotal: true },
-    }),
-    prisma.order.findMany({
-      where: { statusPagamento: "pago", criadoEm: { gte: desde } },
-      select: { criadoEm: true, total: true },
-    }),
-  ]);
 
-  const mapa = new Map<string, { servicos: number; loja: number }>();
-  for (let i = 0; i < dias; i++) {
-    const d = new Date(desde);
-    d.setDate(desde.getDate() + i);
-    mapa.set(chaveDia(d), { servicos: 0, loja: 0 });
-  }
-  for (const a of ags) {
-    const k = chaveDia(a.criadoEm);
-    const e = mapa.get(k);
-    if (e) e.servicos += dec(a.valorTotal);
-  }
-  for (const p of pedidos) {
-    const k = chaveDia(p.criadoEm);
-    const e = mapa.get(k);
-    if (e) e.loja += dec(p.total);
-  }
-  return Array.from(mapa.entries()).map(([data, v]) => ({ data, ...v }));
-}
-
-function chaveDia(d: Date): string {
-  const x = new Date(d);
-  const ano = x.getFullYear();
-  const mes = String(x.getMonth() + 1).padStart(2, "0");
-  const dia = String(x.getDate()).padStart(2, "0");
-  return `${ano}-${mes}-${dia}`;
-}
-
-// Serviços mais vendidos (contagem em agendamentos concluídos).
+// Serviços mais vendidos (contagem em agendamentos concluídos) em uma janela de datas.
 export async function servicosMaisVendidos(
+  desde: Date,
+  ate: Date,
   limite = 6
 ): Promise<{ nome: string; total: number }[]> {
+  const jd = janelaData(desde);
   const linhas = await prisma.appointmentService.findMany({
-    where: { agendamento: { status: "concluido" } },
+    where: { agendamento: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } } },
     select: { servico: { select: { nome: true } } },
   });
   const cont = new Map<string, number>();
@@ -309,12 +282,14 @@ export async function servicosMaisVendidos(
 }
 
 // Ocupação por hora do dia (heatmap simples / barras): quantos agendamentos
-// por horário de início.
-export async function ocupacaoPorHora(): Promise<
-  { hora: string; total: number }[]
-> {
+// por horário de início em uma janela de datas.
+export async function ocupacaoPorHora(
+  desde: Date,
+  _ate: Date
+): Promise<{ hora: string; total: number }[]> {
+  const jd = janelaData(desde);
   const ags = await prisma.appointment.findMany({
-    where: { status: { in: ["concluido", "agendado"] } },
+    where: { status: { in: ["concluido", "agendado"] }, data: { gte: jd.desde, lt: jd.ate } },
     select: { horarioInicio: true },
   });
   const cont = new Map<string, number>();
@@ -380,7 +355,7 @@ export async function rankingProdutos(
 // Ocupação por hora numa janela (concluídos).
 export async function ocupacaoPorHoraJanela(
   desde: Date,
-  ate: Date
+  _ate: Date
 ): Promise<{ hora: string; total: number }[]> {
   const jd = janelaData(desde);
   const ags = await prisma.appointment.findMany({
@@ -399,7 +374,7 @@ const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 // Atendimentos por dia da semana numa janela (concluídos), usando a data do corte.
 export async function ocupacaoPorDiaSemana(
   desde: Date,
-  ate: Date
+  _ate: Date
 ): Promise<{ dia: string; total: number }[]> {
   const jd = janelaData(desde);
   const ags = await prisma.appointment.findMany({
@@ -413,11 +388,57 @@ export async function ocupacaoPorDiaSemana(
   return ordem.map((i) => ({ dia: DIAS[i], total: cont[i] }));
 }
 
+// Heatmap de ocupação: dia da semana (seg..sáb) × hora. Conta agendamentos não
+// cancelados. Retorna a grade de horas presente + matriz de contagens.
+export type OcupacaoHeatmap = {
+  horas: string[]; // colunas, ex ["09:00", ...]
+  dias: { dia: string; dow: number; celulas: number[] }[]; // linhas
+  max: number;
+};
+
+export async function ocupacaoPorHoraEDia(
+  desde: Date,
+  _ate: Date
+): Promise<OcupacaoHeatmap> {
+  const jd = janelaData(desde);
+  const ags = await prisma.appointment.findMany({
+    where: { status: { not: "cancelado" }, data: { gte: jd.desde, lt: jd.ate } },
+    select: { data: true, horarioInicio: true },
+  });
+
+  // dow(UTC, alinha com @db.Date) → hora → contagem
+  const cont = new Map<number, Map<string, number>>();
+  const horasSet = new Set<string>();
+  let max = 0;
+  for (const a of ags) {
+    const dow = a.data.getUTCDay();
+    horasSet.add(a.horarioInicio);
+    const porHora = cont.get(dow) ?? new Map<string, number>();
+    const n = (porHora.get(a.horarioInicio) ?? 0) + 1;
+    porHora.set(a.horarioInicio, n);
+    cont.set(dow, porHora);
+    if (n > max) max = n;
+  }
+
+  const horas = Array.from(horasSet).sort();
+  // ordem seg..sáb (barbearia fecha dom/seg, mas mantém pra contexto se houver)
+  const ordem = [1, 2, 3, 4, 5, 6, 0];
+  const dias = ordem.map((dow) => {
+    const porHora = cont.get(dow);
+    return {
+      dia: DIAS[dow],
+      dow,
+      celulas: horas.map((h) => porHora?.get(h) ?? 0),
+    };
+  });
+  return { horas, dias, max };
+}
+
 // Recorrência: dos clientes atendidos na janela, quantos têm >1 atendimento
 // concluído no histórico total. Retorna taxa (0..1).
 export async function recorrencia(
   desde: Date,
-  ate: Date
+  _ate: Date
 ): Promise<{ recorrentes: number; total: number; taxa: number }> {
   const jd = janelaData(desde);
   const ags = await prisma.appointment.findMany({

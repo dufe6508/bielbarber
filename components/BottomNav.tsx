@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { navCliente, rotaAtiva } from "@/lib/nav";
+import { navClienteVisivel, rotaAtiva } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 
 // Spring compartilhado — dá o "peso" físico ao movimento (pílula, ícone, rótulo)
 const spring = { type: "spring" as const, stiffness: 380, damping: 30, mass: 0.8 };
 
-export function BottomNav() {
+export function BottomNav({ galeriaVisivel = true }: { galeriaVisivel?: boolean }) {
   const pathname = usePathname();
+  const itens = navClienteVisivel(galeriaVisivel);
 
   return (
     <nav
@@ -25,7 +26,7 @@ export function BottomNav() {
       }}
     >
       <div className="flex items-stretch px-1">
-        {navCliente.map((item) => {
+        {itens.map((item) => {
           const Icone = item.icone;
           const ativo = rotaAtiva(pathname, item.href);
           return (

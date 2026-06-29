@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { CalendarClock, Check, Loader2, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -138,6 +138,7 @@ export function AgendaHorizonte() {
         icone={<CalendarRange className="size-4" />}
         resumo={dataLonga(dataCorte)}
         defaultOpen
+        className="mx-auto max-w-sm"
       >
         <div className="mx-auto max-w-[336px] rounded-2xl border border-border bg-background p-3 sm:p-4">
           <MiniCalendar

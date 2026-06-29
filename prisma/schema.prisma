@@ -72,65 +72,88 @@ enum NotificationStatus {
 // ─── Modelos ──────────────────────────────────────────────────────────────────
 
 model Client {
-  id            String   @id @default(uuid())
-  nome          String
-  telefone      String   @unique
-  bloqueado     Boolean  @default(false)
-  podePagarLocal Boolean @default(false) @map("pode_pagar_local")
-  criadoEm      DateTime @default(now()) @map("criado_em")
+  id             String    @id @default(uuid())
+  nome           String
+  telefone       String    @unique
+  bloqueado      Boolean   @default(false)
+  motivoBloqueio String?   @map("motivo_bloqueio")
+  podePagarLocal Boolean   @default(false) @map("pode_pagar_local")
+  // Cliente VIP: destaque manual no painel (prioridade/confiança).
+  vip            Boolean   @default(false)
+  // Anotações livres do barbeiro sobre o cliente (restrições, preferências).
+  observacoes    String?
+  // Fidelidade: carimbos acumulados (corte concluído incrementa).
+  carimbos       Int       @default(0)
+  aniversario    DateTime? @db.Date
+  criadoEm       DateTime  @default(now()) @map("criado_em")
 
-  agendamentos   Appointment[]
-  pedidos        Order[]
-  pacotesCliente ClientPackage[]
-  mensalidade    Subscription?
-  notificacoes   NotificationLog[]
+  agendamentos           Appointment[]
+  pedidos                Order[]
+  pacotesCliente         ClientPackage[]
+  mensalidade            Subscription?
+  notificacoes           NotificationLog[]
+  pushSubscriptions      PushSubscription[]
+  preferenciaNotificacao NotificationPreference?
+  fotos                  ClientPhoto[]
+  listaEspera            Waitlist[]
 
   @@map("clientes")
 }
 
 model Service {
-  id             String  @id @default(uuid())
-  nome           String
-  descricao      String?
-  duracaoMinutos Int     @map("duracao_minutos")
-  preco          Decimal @db.Decimal(10, 2)
-  ativo          Boolean @default(true)
+  id                String  @id @default(uuid())
+  nome              String
+  // URL-safe p/ deep links (/agendar/[slug]). Nullable: backfill em linhas antigas.
+  slug              String? @unique
+  descricao         String?
+  duracaoMinutos    Int     @map("duracao_minutos")
+  preco             Decimal @db.Decimal(10, 2)
+  ativo             Boolean @default(true)
   // Quantos slots de 1h o serviço ocupa. Coloração = 2. Admin edita depois.
-  slotsNecessarios Int   @default(1) @map("slots_necessarios")
+  slotsNecessarios  Int     @default(1) @map("slots_necessarios")
   // Quantos clientes o barbeiro aceita no mesmo horário para este serviço (1 = exclusivo).
-  capacidadePorSlot Int  @default(1) @map("capacidade_por_slot")
+  capacidadePorSlot Int     @default(1) @map("capacidade_por_slot")
   // Ordem de exibição no fluxo do cliente e no painel.
-  ordem            Int   @default(0)
+  ordem             Int     @default(0)
 
   agendamentoServicos AppointmentService[]
   pacoteServicos      PackageService[]
+  galeriaCategorias   GalleryCategory[]
 
   @@map("servicos")
 }
 
 model Appointment {
-  id             String            @id @default(uuid())
-  clienteId      String            @map("cliente_id")
-  data           DateTime          @db.Date
-  horarioInicio  String            @map("horario_inicio")
-  slots          Int               @default(1) // qtd de horários de 1h ocupados
-  status         AppointmentStatus @default(agendado)
-  statusPagamento PaymentStatus    @default(pendente) @map("status_pagamento")
-  formaPagamento PaymentMethod     @map("forma_pagamento")
-  valorTotal     Decimal           @db.Decimal(10, 2) @map("valor_total")
-  criadoEm       DateTime          @default(now()) @map("criado_em")
+  id               String            @id @default(uuid())
+  clienteId        String            @map("cliente_id")
+  data             DateTime          @db.Date
+  horarioInicio    String            @map("horario_inicio")
+  slots            Int               @default(1) // qtd de horários de 1h ocupados
+  status           AppointmentStatus @default(agendado)
+  statusPagamento  PaymentStatus     @default(pendente) @map("status_pagamento")
+  formaPagamento   PaymentMethod     @map("forma_pagamento")
+  valorTotal       Decimal           @map("valor_total") @db.Decimal(10, 2)
+  // Avaliação pós-corte (cliente preenche depois de concluido).
+  rating           Int?
+  ratingComentario String?           @map("rating_comentario")
+  ratingEm         DateTime?         @map("rating_em")
+  // Check-in digital: marcado quando cliente toca "Cheguei!".
+  checkinEm        DateTime?         @map("checkin_em")
+  criadoEm         DateTime          @default(now()) @map("criado_em")
 
   cliente   Client               @relation(fields: [clienteId], references: [id])
   servicos  AppointmentService[]
   pagamento Payment?
 
+  @@index([data, status])
+  @@index([clienteId])
   @@map("agendamentos")
 }
 
 model AppointmentService {
   agendamentoId String  @map("agendamento_id")
   servicoId     String  @map("servico_id")
-  precoNaHora   Decimal @db.Decimal(10, 2) @map("preco_na_hora")
+  precoNaHora   Decimal @map("preco_na_hora") @db.Decimal(10, 2)
 
   agendamento Appointment @relation(fields: [agendamentoId], references: [id])
   servico     Service     @relation(fields: [servicoId], references: [id])
@@ -142,9 +165,10 @@ model AppointmentService {
 model Product {
   id                String   @id @default(uuid())
   nome              String
+  slug              String?  @unique
   descricao         String?
   preco             Decimal  @db.Decimal(10, 2)
-  precoAntigo       Decimal? @db.Decimal(10, 2) @map("preco_antigo")
+  precoAntigo       Decimal? @map("preco_antigo") @db.Decimal(10, 2)
   quantidadeEstoque Int      @default(0) @map("quantidade_estoque")
   urlImagem         String?  @map("url_imagem")
   categoria         String?
@@ -162,19 +186,20 @@ model Product {
 }
 
 model Package {
-  id           String      @id @default(uuid())
-  nome         String
-  descricao    String?
-  tipo         PackageType
-  preco        Decimal     @db.Decimal(10, 2)
-  validadeDias Int?        @map("validade_dias")
+  id               String      @id @default(uuid())
+  nome             String
+  slug             String?     @unique
+  descricao        String?
+  tipo             PackageType
+  preco            Decimal     @db.Decimal(10, 2)
+  validadeDias     Int?        @map("validade_dias")
   // Planos recorrentes (assinatura): quantos usos por mês e teto por semana.
-  quantidadeMensal Int?    @map("quantidade_mensal")
-  limiteSemanal    Int?    @map("limite_semanal")
-  renovavel        Boolean @default(false)
-  destaque         Boolean @default(false)
-  ativo        Boolean     @default(true)
-  ordem        Int         @default(0)
+  quantidadeMensal Int?        @map("quantidade_mensal")
+  limiteSemanal    Int?        @map("limite_semanal")
+  renovavel        Boolean     @default(false)
+  destaque         Boolean     @default(false)
+  ativo            Boolean     @default(true)
+  ordem            Int         @default(0)
 
   servicos       PackageService[]
   produtos       PackageProduct[]
@@ -222,15 +247,15 @@ model ClientPackage {
 }
 
 model Subscription {
-  id                  String             @id @default(uuid())
-  clienteId           String             @unique @map("cliente_id")
-  diaCobranca         Int                @map("dia_cobranca")
-  status              SubscriptionStatus @default(ativo)
-  totalCicloAtual     Decimal            @default(0) @db.Decimal(10, 2) @map("total_ciclo_atual")
-  dataUltimoPagamento DateTime?          @map("data_ultimo_pagamento")
-  valorUltimoPagamento Decimal?          @db.Decimal(10, 2) @map("valor_ultimo_pagamento")
-  proximaCobranca     DateTime?          @map("proxima_cobranca")
-  criadoEm            DateTime           @default(now()) @map("criado_em")
+  id                   String             @id @default(uuid())
+  clienteId            String             @unique @map("cliente_id")
+  diaCobranca          Int                @map("dia_cobranca")
+  status               SubscriptionStatus @default(ativo)
+  totalCicloAtual      Decimal            @default(0) @map("total_ciclo_atual") @db.Decimal(10, 2)
+  dataUltimoPagamento  DateTime?          @map("data_ultimo_pagamento")
+  valorUltimoPagamento Decimal?           @map("valor_ultimo_pagamento") @db.Decimal(10, 2)
+  proximaCobranca      DateTime?          @map("proxima_cobranca")
+  criadoEm             DateTime           @default(now()) @map("criado_em")
 
   cliente    Client    @relation(fields: [clienteId], references: [id])
   pagamentos Payment[]
@@ -239,18 +264,20 @@ model Subscription {
 }
 
 model Order {
-  id             String            @id @default(uuid())
-  clienteId      String            @map("cliente_id")
-  total          Decimal           @db.Decimal(10, 2)
-  statusPagamento PaymentStatus    @default(pendente) @map("status_pagamento")
-  formaPagamento PaymentMethod?    @map("forma_pagamento")
-  statusRetirada OrderPickupStatus @default(pendente) @map("status_retirada")
-  criadoEm       DateTime          @default(now()) @map("criado_em")
+  id              String            @id @default(uuid())
+  clienteId       String            @map("cliente_id")
+  total           Decimal           @db.Decimal(10, 2)
+  statusPagamento PaymentStatus     @default(pendente) @map("status_pagamento")
+  formaPagamento  PaymentMethod?    @map("forma_pagamento")
+  statusRetirada  OrderPickupStatus @default(pendente) @map("status_retirada")
+  criadoEm        DateTime          @default(now()) @map("criado_em")
 
   cliente   Client      @relation(fields: [clienteId], references: [id])
   itens     OrderItem[]
   pagamento Payment?
 
+  @@index([criadoEm, statusPagamento])
+  @@index([clienteId])
   @@map("pedidos")
 }
 
@@ -259,7 +286,7 @@ model OrderItem {
   pedidoId    String  @map("pedido_id")
   produtoId   String  @map("produto_id")
   quantidade  Int
-  precoNaHora Decimal @db.Decimal(10, 2) @map("preco_na_hora")
+  precoNaHora Decimal @map("preco_na_hora") @db.Decimal(10, 2)
 
   pedido  Order   @relation(fields: [pedidoId], references: [id])
   produto Product @relation(fields: [produtoId], references: [id])
@@ -273,7 +300,7 @@ model Payment {
   agendamentoId          String?       @unique @map("agendamento_id")
   pedidoId               String?       @unique @map("pedido_id")
   mensalistaId           String?       @map("mensalista_id")
-  periodoCobranca        DateTime?     @db.Date @map("periodo_cobranca")
+  periodoCobranca        DateTime?     @map("periodo_cobranca") @db.Date
   valor                  Decimal       @db.Decimal(10, 2)
   metodo                 PaymentMethod
   status                 PaymentStatus @default(pendente)
@@ -285,6 +312,7 @@ model Payment {
   pedido      Order?        @relation(fields: [pedidoId], references: [id])
   mensalista  Subscription? @relation(fields: [mensalistaId], references: [id])
 
+  @@unique([mensalistaId, periodoCobranca])
   @@map("pagamentos")
 }
 
@@ -307,13 +335,13 @@ enum ScheduleExceptionType {
 }
 
 model ScheduleException {
-  id        String                @id @default(uuid())
-  data      DateTime              @unique @db.Date
-  tipo      ScheduleExceptionType
+  id       String                @id @default(uuid())
+  data     DateTime              @unique @db.Date
+  tipo     ScheduleExceptionType
   // Quando tipo = horarios: lista de "HH:00" abertos nesse dia. Vazio quando fechado.
-  horarios  String[]              @default([])
-  motivo    String?
-  criadoEm  DateTime              @default(now()) @map("criado_em")
+  horarios String[]              @default([])
+  motivo   String?
+  criadoEm DateTime              @default(now()) @map("criado_em")
 
   @@map("agenda_excecoes")
 }
@@ -340,4 +368,195 @@ model NotificationLog {
   cliente Client @relation(fields: [clienteId], references: [id])
 
   @@map("log_notificacoes")
+}
+
+// ─── Sprint 1: push notifications (base estrutural, sem envio ainda) ────────
+model PushSubscription {
+  id        String   @id @default(uuid())
+  clienteId String   @map("cliente_id")
+  endpoint  String   @unique
+  p256dh    String   @map("p256dh")
+  auth      String
+  userAgent String?  @map("user_agent")
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  cliente Client @relation(fields: [clienteId], references: [id])
+
+  @@index([clienteId])
+  @@map("push_subscriptions")
+}
+
+model NotificationPreference {
+  id                 String  @id @default(uuid())
+  clienteId          String  @unique @map("cliente_id")
+  pushAtivo          Boolean @default(true) @map("push_ativo")
+  whatsappAtivo      Boolean @default(false) @map("whatsapp_ativo")
+  confirmacao        Boolean @default(true)
+  lembrete           Boolean @default(true)
+  promocao           Boolean @default(false)
+  assinaturaVencendo Boolean @default(true) @map("assinatura_vencendo")
+  estoqueNovo        Boolean @default(false) @map("estoque_novo")
+
+  cliente Client @relation(fields: [clienteId], references: [id])
+
+  @@map("preferencias_notificacao")
+}
+
+// ─── Sprint 2: galeria / portfólio visual (distinto de Service) ─────────────
+model GalleryCategory {
+  id         String   @id @default(uuid())
+  nome       String
+  slug       String   @unique
+  descricao  String?
+  precoMedio Decimal? @map("preco_medio") @db.Decimal(10, 2)
+  imagemCapa String?  @map("imagem_capa")
+  ativo      Boolean  @default(true)
+  destaque   Boolean  @default(false)
+  ordem      Int      @default(0)
+  servicoId  String?  @map("servico_id")
+  criadoEm   DateTime @default(now()) @map("criado_em")
+
+  imagens GalleryImage[]
+  servico Service?       @relation(fields: [servicoId], references: [id])
+
+  @@map("galeria_categorias")
+}
+
+model GalleryImage {
+  id          String   @id @default(uuid())
+  categoriaId String   @map("categoria_id")
+  urlImagem   String   @map("url_imagem")
+  ordem       Int      @default(0)
+  destaque    Boolean  @default(false)
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  categoria GalleryCategory @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@index([categoriaId, ordem])
+  @@map("galeria_imagens")
+}
+
+// ─── Sprint 3: fila de espera ───────────────────────────────────────────────
+model Waitlist {
+  id        String   @id @default(uuid())
+  clienteId String   @map("cliente_id")
+  data      DateTime @db.Date
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  cliente Client @relation(fields: [clienteId], references: [id])
+
+  @@unique([clienteId, data])
+  @@index([data])
+  @@map("lista_espera")
+}
+
+// ─── Sprint 4: galeria privada por cliente (fotos do admin) ─────────────────
+model ClientPhoto {
+  id        String   @id @default(uuid())
+  clienteId String   @map("cliente_id")
+  urlImagem String   @map("url_imagem")
+  legenda   String?
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  cliente Client @relation(fields: [clienteId], references: [id])
+
+  @@index([clienteId])
+  @@map("fotos_cliente")
+}
+
+// ─── Contabilidade: despesas, recorrência, ajustes, imposto ─────────────────
+
+enum ExpenseCategory {
+  aluguel
+  agua
+  luz
+  internet
+  produtos
+  funcionarios
+  impostos
+  manutencao
+  marketing
+  outros
+}
+
+enum ExpenseStatus {
+  pago
+  pendente
+}
+
+enum AdjustmentType {
+  entrada
+  saida
+}
+
+enum TaxMode {
+  percentual
+  fixo
+  nenhum
+}
+
+// Despesa individual (lançamento real de um mês). Quando recorrenteId está
+// preenchido, esta linha é o override de um molde recorrente naquele mês.
+model Expense {
+  id           String          @id @default(uuid())
+  nome         String
+  categoria    ExpenseCategory
+  valor        Decimal         @db.Decimal(10, 2)
+  data         DateTime        @db.Date
+  status       ExpenseStatus   @default(pago)
+  observacao   String?
+  recorrenteId String?         @map("recorrente_id")
+  criadoEm     DateTime        @default(now()) @map("criado_em")
+
+  recorrente RecurringExpense? @relation(fields: [recorrenteId], references: [id], onDelete: SetNull)
+
+  @@index([data])
+  @@index([recorrenteId, data])
+  @@map("despesas")
+}
+
+// Molde recorrente: materializa uma despesa virtual em cada mês a partir de
+// dataInicio. Override-on-edit (ver lib/admin/accounting.ts).
+model RecurringExpense {
+  id            String          @id @default(uuid())
+  nome          String
+  categoria     ExpenseCategory
+  valor         Decimal         @db.Decimal(10, 2)
+  diaVencimento Int?            @map("dia_vencimento")
+  dataInicio    DateTime        @db.Date @map("data_inicio")
+  ativo         Boolean         @default(true)
+  // Valor varia a cada mês (luz, gasolina): `valor` é só estimativa; admin
+  // confirma o real no mês. Fixo (false) = mesmo valor todo mês (aluguel).
+  variavel      Boolean         @default(false)
+  observacao    String?
+  criadoEm      DateTime        @default(now()) @map("criado_em")
+
+  overrides Expense[]
+
+  @@map("despesas_recorrentes")
+}
+
+// Ajuste manual de faturamento (auditoria): entrada ou saída avulsa.
+model AccountingAdjustment {
+  id       String         @id @default(uuid())
+  data     DateTime       @db.Date
+  valor    Decimal        @db.Decimal(10, 2)
+  tipo     AdjustmentType
+  motivo   String
+  criadoEm DateTime       @default(now()) @map("criado_em")
+
+  @@index([data])
+  @@map("ajustes_contabeis")
+}
+
+// Config de imposto — linha única (id "default").
+model TaxSetting {
+  id           String   @id @default("default")
+  modo         TaxMode  @default(nenhum)
+  taxa         Decimal  @default(0) @db.Decimal(5, 2)
+  valorFixo    Decimal  @default(0) @map("valor_fixo") @db.Decimal(10, 2)
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("config_imposto")
 }

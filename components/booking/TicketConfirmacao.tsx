@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Check, MapPin, CalendarPlus } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
 import { formatarPreco, formatarData } from "@/lib/utils/format";

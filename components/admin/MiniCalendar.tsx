@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -221,7 +221,7 @@ export function MiniCalendar({
                   )}
                   <span className="relative">{d.getDate()}</span>
                   {temMarca && (
-                    <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-foreground ring-2 ring-card" />
+                    <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-foreground ring-2 ring-background" />
                   )}
                 </button>
               );
