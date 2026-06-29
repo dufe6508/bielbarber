@@ -16,15 +16,19 @@ const PADRAO: Perfil = {
 };
 
 export async function getPerfil(): Promise<Perfil> {
-  const linhas = await prisma.setting.findMany({
-    where: { chave: { in: Object.values(CHAVES) } },
-  });
-  const v = (c: string) => linhas.find((l) => l.chave === c)?.valor;
-  return {
-    nome: v(CHAVES.nome) || PADRAO.nome,
-    local: v(CHAVES.local) || PADRAO.local,
-    logoUrl: v(CHAVES.logo) || PADRAO.logoUrl,
-  };
+  try {
+    const linhas = await prisma.setting.findMany({
+      where: { chave: { in: Object.values(CHAVES) } },
+    });
+    const v = (c: string) => linhas.find((l) => l.chave === c)?.valor;
+    return {
+      nome: v(CHAVES.nome) || PADRAO.nome,
+      local: v(CHAVES.local) || PADRAO.local,
+      logoUrl: v(CHAVES.logo) || PADRAO.logoUrl,
+    };
+  } catch {
+    return { ...PADRAO };
+  }
 }
 
 export async function setPerfil(p: Partial<Perfil>): Promise<void> {

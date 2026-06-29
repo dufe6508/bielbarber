@@ -57,11 +57,15 @@ const CHAVE_HORIZONTE = "horizonte_agendamento_dias";
 const HORIZONTE_PADRAO = 60;
 
 export async function getHorizonteDias(): Promise<number> {
-  const linha = await prisma.setting.findUnique({
-    where: { chave: CHAVE_HORIZONTE },
-  });
-  const n = linha ? parseInt(linha.valor, 10) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : HORIZONTE_PADRAO;
+  try {
+    const linha = await prisma.setting.findUnique({
+      where: { chave: CHAVE_HORIZONTE },
+    });
+    const n = linha ? parseInt(linha.valor, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : HORIZONTE_PADRAO;
+  } catch {
+    return HORIZONTE_PADRAO;
+  }
 }
 
 export async function setHorizonteDias(dias: number): Promise<void> {
@@ -78,11 +82,14 @@ export async function setHorizonteDias(dias: number): Promise<void> {
 const CHAVE_GALERIA = "galeria_visivel";
 
 export async function getGaleriaVisivel(): Promise<boolean> {
-  const linha = await prisma.setting.findUnique({
-    where: { chave: CHAVE_GALERIA },
-  });
-  // Padrão: visível (só esconde quando explicitamente "false").
-  return linha?.valor !== "false";
+  try {
+    const linha = await prisma.setting.findUnique({
+      where: { chave: CHAVE_GALERIA },
+    });
+    return linha?.valor !== "false";
+  } catch {
+    return true;
+  }
 }
 
 export async function setGaleriaVisivel(visivel: boolean): Promise<void> {
@@ -104,16 +111,20 @@ const FID_RECOMPENSA_PADRAO = "Corte grátis";
 export type Fidelidade = { fidelidadeMeta: number; fidelidadeRecompensa: string };
 
 export async function getFidelidade(): Promise<Fidelidade> {
-  const linhas = await prisma.setting.findMany({
-    where: { chave: { in: [CHAVE_FID_META, CHAVE_FID_RECOMPENSA] } },
-  });
-  const meta = linhas.find((l) => l.chave === CHAVE_FID_META)?.valor;
-  const recompensa = linhas.find((l) => l.chave === CHAVE_FID_RECOMPENSA)?.valor;
-  const n = meta ? parseInt(meta, 10) : NaN;
-  return {
-    fidelidadeMeta: Number.isFinite(n) && n > 0 ? n : FID_META_PADRAO,
-    fidelidadeRecompensa: recompensa || FID_RECOMPENSA_PADRAO,
-  };
+  try {
+    const linhas = await prisma.setting.findMany({
+      where: { chave: { in: [CHAVE_FID_META, CHAVE_FID_RECOMPENSA] } },
+    });
+    const meta = linhas.find((l) => l.chave === CHAVE_FID_META)?.valor;
+    const recompensa = linhas.find((l) => l.chave === CHAVE_FID_RECOMPENSA)?.valor;
+    const n = meta ? parseInt(meta, 10) : NaN;
+    return {
+      fidelidadeMeta: Number.isFinite(n) && n > 0 ? n : FID_META_PADRAO,
+      fidelidadeRecompensa: recompensa || FID_RECOMPENSA_PADRAO,
+    };
+  } catch {
+    return { fidelidadeMeta: FID_META_PADRAO, fidelidadeRecompensa: FID_RECOMPENSA_PADRAO };
+  }
 }
 
 // Lê só a meta — usado pela lógica de incremento de carimbos no admin.
