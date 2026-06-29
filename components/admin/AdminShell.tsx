@@ -8,6 +8,7 @@ import { LogOut, Loader2, MapPin, MoreHorizontal, X } from "lucide-react";
 import { navAdmin, rotaAtivaAdmin } from "@/lib/navAdmin";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/admin/NotificationBell";
 import { cn } from "@/lib/utils";
 
 // Itens primários no bottom nav (mobile). O resto vai pro sheet "Mais".
@@ -112,6 +113,10 @@ export function AdminShell({
             {saindo ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
             Sair
           </button>
+          <NotificationBell
+            placement="sidebar"
+            className="size-8 text-sidebar-foreground/40 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+          />
           <ThemeToggle className="text-sidebar-foreground/40 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground" />
         </div>
 
@@ -134,6 +139,12 @@ export function AdminShell({
               <span className="font-mono text-[8px] uppercase tracking-[0.28em] text-muted-foreground/60">
                 {perfil.nome}
               </span>
+            </div>
+            <div className="ml-auto flex items-center gap-1">
+              <NotificationBell
+                placement="topbar"
+                className="size-9 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+              />
             </div>
           </div>
         </header>

@@ -103,6 +103,26 @@ function reais(v: number): string {
   return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Envia push direto para uma subscription raw (sem busca no banco).
+// Usado para testes onde a subscription é passada diretamente pelo frontend.
+export async function sendPushDirect(
+  subscription: { endpoint: string; p256dh: string; auth: string },
+  event: NotificationEvent
+): Promise<{ ok: boolean; error?: string }> {
+  if (!configurar()) return { ok: false, error: "VAPID não configurado" };
+  const payload = JSON.stringify(montarPayload(event));
+  try {
+    await webpush.sendNotification(
+      { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
+      payload
+    );
+    return { ok: true };
+  } catch (err) {
+    const status = (err as { statusCode?: number })?.statusCode;
+    return { ok: false, error: `Falha ao enviar push (${status ?? "desconhecido"})` };
+  }
+}
+
 // Envia push para todas as assinaturas ativas do cliente, respeitando a
 // preferência do tipo de evento. No-op silencioso se o VAPID não estiver configurado.
 export async function sendPushToClient(
