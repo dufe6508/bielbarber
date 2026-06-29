@@ -8,7 +8,6 @@ import {
   CalendarDays,
   Phone,
   Moon,
-  Info,
   Scissors,
   Check,
   X,
@@ -176,46 +175,37 @@ export function AgendaDia() {
               const ehSegunda = segundaParte.has(h) && !ag;
               return (
                 <li key={h} className="flex gap-3">
-                  <span className="w-12 shrink-0 pt-3 text-right font-mono text-xs font-medium tabular-nums text-muted-foreground">
+                  <span className="w-12 shrink-0 pt-2.5 text-right font-mono text-xs font-medium tabular-nums text-muted-foreground">
                     {h}
                   </span>
                   {ag ? (
                     <button
                       onClick={() => setAlvo(ag)}
-                      className="flex-1 rounded-xl border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-muted/40 active:scale-[0.99]"
+                      className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 text-left shadow-xs transition-colors hover:bg-muted/40 active:scale-[0.99]"
                     >
-                      {/* Topo: nome + (i) */}
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                      {/* Esquerda: nome + serviço + telefone */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold leading-tight text-foreground">
                           {ag.cliente.nome}
                         </p>
-                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground">
-                          <Info className="size-3.5" />
-                        </span>
+                        <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                          <Scissors className="size-3 shrink-0" />
+                          {ag.servicos.join(", ")}
+                          <span className="text-muted-foreground/50">·</span>
+                          {formatarTelefone(ag.cliente.telefone)}
+                        </p>
                       </div>
 
-                      {/* Serviços */}
-                      <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                        <Scissors className="size-3 shrink-0" />
-                        {ag.servicos.join(", ")}
-                      </p>
-
-                      {/* Telefone */}
-                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <Phone className="size-3 shrink-0" />
-                        {formatarTelefone(ag.cliente.telefone)}
-                      </p>
-
-                      {/* Rodapé: valor + status */}
-                      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+                      {/* Direita: valor + status */}
+                      <div className="flex shrink-0 flex-col items-end gap-1">
                         <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
                           {formatarPreco(ag.valorTotal)}
                         </span>
-                        <div className="flex flex-wrap items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          {ag.slots >= 2 && <Pill tom="neutro">2h</Pill>}
                           <Pill tom={STATUS_TOM[ag.status] ?? "neutro"}>
                             {STATUS_ROTULO[ag.status] ?? ag.status}
                           </Pill>
-                          {ag.slots >= 2 && <Pill tom="neutro">2h</Pill>}
                           <Pill tom={ag.statusPagamento === "pago" ? "verde" : "neutro"}>
                             {ag.statusPagamento === "pago" ? "pago" : "pendente"}
                           </Pill>
@@ -225,7 +215,7 @@ export function AgendaDia() {
                   ) : (
                     <div
                       className={cn(
-                        "flex flex-1 items-center rounded-xl border border-dashed px-3 py-3 text-xs",
+                        "flex flex-1 items-center rounded-xl border border-dashed px-3 py-2 text-xs",
                         ehSegunda
                           ? "border-border bg-muted/40 text-muted-foreground"
                           : "border-border/60 text-muted-foreground/60"
