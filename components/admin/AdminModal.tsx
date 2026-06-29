@@ -78,6 +78,95 @@ export function AdminModal({
   );
 }
 
+// Dialog de confirmação compacto — substitui window.confirm().
+export function ConfirmDialog({
+  aberto,
+  titulo,
+  mensagem,
+  rotuloCancelar = "Cancelar",
+  rotuloConfirmar = "Confirmar",
+  perigo = false,
+  onCancelar,
+  onConfirmar,
+}: {
+  aberto: boolean;
+  titulo: string;
+  mensagem?: string;
+  rotuloCancelar?: string;
+  rotuloConfirmar?: string;
+  perigo?: boolean;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}) {
+  const montado = useMounted();
+
+  useEffect(() => {
+    if (!aberto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancelar();
+      if (e.key === "Enter") onConfirmar();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [aberto, onCancelar, onConfirmar]);
+
+  if (!montado) return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {aberto && (
+        <motion.div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          <button
+            type="button"
+            aria-label="Cancelar"
+            onClick={onCancelar}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+            className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl"
+          >
+            <h3 className="font-heading text-sm font-semibold text-foreground">{titulo}</h3>
+            {mensagem && (
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{mensagem}</p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onCancelar}
+                className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                {rotuloCancelar}
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmar}
+                className={`inline-flex h-9 items-center rounded-lg px-4 text-sm font-semibold text-white transition-all active:scale-95 ${
+                  perigo
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-foreground hover:opacity-85"
+                }`}
+              >
+                {rotuloConfirmar}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  );
+}
+
 // Campo de formulário reutilizável (label + input estilizado).
 export function Campo({
   rotulo,

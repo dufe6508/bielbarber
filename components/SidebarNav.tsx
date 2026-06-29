@@ -49,7 +49,15 @@ const SOLID_STYLE: React.CSSProperties = {
   WebkitBackdropFilter: "none",
 };
 
-export function SidebarNav({ galeriaVisivel = true }: { galeriaVisivel?: boolean }) {
+export function SidebarNav({
+  galeriaVisivel = true,
+  nome = "Biel Barber",
+  local = "Av. Serrinha, 82 · Vale do Jatobá",
+}: {
+  galeriaVisivel?: boolean;
+  nome?: string;
+  local?: string;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const itens = navClienteVisivel(galeriaVisivel);
@@ -133,10 +141,7 @@ export function SidebarNav({ galeriaVisivel = true }: { galeriaVisivel?: boolean
                 className="flex flex-col overflow-hidden"
               >
                 <span className="font-heading text-[17px] font-bold tracking-tight text-sidebar-foreground whitespace-nowrap">
-                  Biel Barber
-                </span>
-                <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-sidebar-foreground/45">
-                  Shop
+                  {nome}
                 </span>
               </motion.span>
             )}
@@ -277,7 +282,7 @@ export function SidebarNav({ galeriaVisivel = true }: { galeriaVisivel?: boolean
               className="flex items-center gap-2 whitespace-nowrap"
             >
               <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
-              Av. Serrinha, 82 · Vale do Jatobá
+              {local}
             </motion.span>
           )}
         </AnimatePresence>

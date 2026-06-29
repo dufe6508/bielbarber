@@ -4,7 +4,7 @@ import { AdminSecretLogo } from "@/components/AdminSecretLogo";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 // Barra superior — só no mobile (md:hidden). No desktop a SidebarNav assume.
-export function TopBar() {
+export function TopBar({ nome = "Biel Barber" }: { nome?: string }) {
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 md:hidden">
       <div className="flex h-14 items-center px-5">
@@ -17,10 +17,7 @@ export function TopBar() {
           </span>
           <span className="inline-flex items-baseline gap-1.5">
             <span className="font-heading text-lg font-semibold tracking-[-0.01em] text-foreground">
-              Biel Barber
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70">
-              Shop
+              {nome}
             </span>
           </span>
         </AdminSecretLogo>

@@ -15,9 +15,10 @@ import {
   FileText,
   Users,
   Receipt,
+  BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminModal, Campo, inputCls } from "@/components/admin/AdminModal";
+import { AdminModal, ConfirmDialog, Campo, inputCls } from "@/components/admin/AdminModal";
 import { Pill } from "@/components/admin/primitives";
 import { CobrancasManager } from "@/components/admin/mensalistas/CobrancasManager";
 import { formatarPreco, formatarData, formatarTelefone } from "@/lib/utils/format";
@@ -56,6 +57,13 @@ export function MensalistasManager() {
   const [diaCobranca, setDiaCobranca] = useState<10 | 30>(10);
   const [salvando, setSalvando] = useState(false);
   const [emitindo, setEmitindo] = useState<string | null>(null);
+  const [confirmacao, setConfirmacao] = useState<{
+    titulo: string;
+    mensagem?: string;
+    perigo?: boolean;
+    rotuloConfirmar?: string;
+    onConfirmar: () => void;
+  } | null>(null);
 
   async function carregar() {
     setCarregando(true);
@@ -99,9 +107,7 @@ export function MensalistasManager() {
     }
   }
 
-  async function marcarPago(m: Mensalista) {
-    if (!confirm(`Confirmar pagamento de ${formatarPreco(m.totalCiclo)} de ${m.nome}?`))
-      return;
+  async function _marcarPago(m: Mensalista) {
     const res = await fetch(`/api/admin/mensalistas/${m.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -113,10 +119,27 @@ export function MensalistasManager() {
     } else toast.error("Erro.");
   }
 
-  async function desativar(m: Mensalista) {
-    if (!confirm(`Remover ${m.nome} dos mensalistas?`)) return;
-    await fetch(`/api/admin/mensalistas/${m.id}`, { method: "DELETE" });
-    carregar();
+  function marcarPago(m: Mensalista) {
+    setConfirmacao({
+      titulo: "Quitar ciclo",
+      mensagem: `Confirmar pagamento de ${formatarPreco(m.totalCiclo)} de ${m.nome}?`,
+      rotuloConfirmar: "Quitar",
+      onConfirmar: () => { setConfirmacao(null); _marcarPago(m); },
+    });
+  }
+
+  function desativar(m: Mensalista) {
+    setConfirmacao({
+      titulo: "Remover mensalista",
+      mensagem: `Remover ${m.nome} dos mensalistas? Esta ação não pode ser desfeita.`,
+      perigo: true,
+      rotuloConfirmar: "Remover",
+      onConfirmar: async () => {
+        setConfirmacao(null);
+        await fetch(`/api/admin/mensalistas/${m.id}`, { method: "DELETE" });
+        carregar();
+      },
+    });
   }
 
   // Emite uma cobrança manual imediata para o mensalista.
@@ -216,20 +239,29 @@ export function MensalistasManager() {
               <motion.li
                 key={m.id}
                 layout
-                className="rounded-2xl border border-border bg-card p-4 shadow-xs"
+                className="rounded-xl border border-border bg-card px-3.5 py-3 shadow-xs"
               >
-                {/* Topo: nome + status */}
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="min-w-0 truncate font-heading text-base font-semibold text-foreground">
+                {/* Topo: nome + status + remover */}
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="min-w-0 truncate font-heading text-sm font-semibold text-foreground">
                     {m.nome}
                   </h3>
-                  <Pill tom={e.tom}>
-                    <Icone className="size-3" /> {e.rotulo}
-                  </Pill>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Pill tom={e.tom}>
+                      <Icone className="size-3" /> {e.rotulo}
+                    </Pill>
+                    <button
+                      onClick={() => desativar(m)}
+                      className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                      aria-label="Remover"
+                    >
+                      <UserMinus className="size-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Metadados */}
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <Phone className="size-3 shrink-0" /> {formatarTelefone(m.telefone)}
                   </span>
@@ -237,55 +269,49 @@ export function MensalistasManager() {
                     <CalendarClock className="size-3 shrink-0" /> Fecha dia {m.diaCobranca}
                   </span>
                   {m.proximaCobranca && (
-                    <span className="text-muted-foreground/80">Próx. {formatarData(m.proximaCobranca)}</span>
+                    <span className="text-muted-foreground/70">Próx. {formatarData(m.proximaCobranca)}</span>
                   )}
                 </div>
 
-                {/* Valor do ciclo */}
-                <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xl font-semibold tabular-nums leading-none text-foreground">
+                {/* Valor + ações */}
+                <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-base font-semibold tabular-nums leading-none text-foreground">
                       {formatarPreco(m.totalCiclo)}
                     </p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <Scissors className="size-3 shrink-0" />
+                    <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <Scissors className="size-2.5 shrink-0" />
                       {m.atendimentosCiclo} {m.atendimentosCiclo === 1 ? "corte" : "cortes"} no ciclo
                     </p>
                   </div>
-                  <button
-                    onClick={() => desativar(m)}
-                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
-                    aria-label="Remover"
-                  >
-                    <UserMinus className="size-4" />
-                  </button>
-                </div>
 
-                {/* Ações: emitir cobrança + marcar pago direto */}
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {/* Emitir cobrança */}
                   <button
                     onClick={() => emitirCobranca(m)}
                     disabled={emitindo === m.id}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 text-xs font-medium text-foreground transition-all hover:bg-muted active:scale-95 disabled:opacity-50"
                   >
                     {emitindo === m.id ? (
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <Loader2 className="size-3 animate-spin" />
                     ) : (
-                      <FileText className="size-3.5" />
+                      <FileText className="size-3" />
                     )}
-                    Emitir cobrança
+                    Cobrança
                   </button>
+
+                  {/* Quitar ciclo */}
                   <button
                     onClick={() => marcarPago(m)}
                     disabled={m.totalCiclo === 0}
                     className={cn(
-                      "inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-colors",
+                      "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all active:scale-95",
                       m.totalCiclo === 0
-                        ? "cursor-not-allowed bg-muted/50 text-muted-foreground/50"
-                        : "bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400"
+                        ? "cursor-not-allowed bg-muted/30 text-muted-foreground/40"
+                        : "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
                     )}
                   >
-                    <CheckCircle2 className="size-3.5" /> Quitar ciclo
+                    <BadgeCheck className="size-3.5 shrink-0" />
+                    Quitar
                   </button>
                 </div>
               </motion.li>
@@ -293,6 +319,16 @@ export function MensalistasManager() {
           })}
         </ul>
       )}
+
+      <ConfirmDialog
+        aberto={!!confirmacao}
+        titulo={confirmacao?.titulo ?? ""}
+        mensagem={confirmacao?.mensagem}
+        perigo={confirmacao?.perigo}
+        rotuloConfirmar={confirmacao?.rotuloConfirmar}
+        onCancelar={() => setConfirmacao(null)}
+        onConfirmar={() => confirmacao?.onConfirmar()}
+      />
 
       <AdminModal
         aberto={modal}
