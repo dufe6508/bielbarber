@@ -20,8 +20,8 @@ self.addEventListener("push", (event) => {
     : [{ action: "abrir", title: "Abrir app" }];
   const opts = {
     body: dados.body || "",
-    icon: dados.icon || "/icon-rounded-192.png",
-    badge: "/icon-rounded-192.png",
+    icon: dados.icon || "/biel-logo.png",
+    badge: "/biel-logo.png",
     tag: dados.tag || undefined,
     renotify: Boolean(dados.tag),
     requireInteraction: Boolean(dados.requireInteraction),
