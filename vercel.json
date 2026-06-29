@@ -1,16 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/cobrancas",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/lembretes",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/diario",
-      "schedule": "0 11 * * *"
-    }
-  ]
-}
+{}
