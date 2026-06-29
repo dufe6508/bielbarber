@@ -8,6 +8,7 @@ import { navClienteVisivel, rotaAtiva } from "@/lib/nav";
 import { Logo } from "@/components/Logo";
 import { AdminSecretLogo } from "@/components/AdminSecretLogo";
 import { cn } from "@/lib/utils";
+import { ClientNotificationBell } from "@/components/ClientNotificationBell";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 
@@ -282,6 +283,12 @@ export function SidebarNav({ galeriaVisivel = true }: { galeriaVisivel?: boolean
           )}
         </AnimatePresence>
 
+        {!collapsed && (
+          <ClientNotificationBell
+            placement="sidebar"
+            className="size-8 text-sidebar-foreground/40 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+          />
+        )}
         <ThemeToggle
           className={
             collapsed

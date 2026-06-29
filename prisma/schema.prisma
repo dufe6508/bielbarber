@@ -76,10 +76,12 @@ enum NotificationType {
   confirmacao
   lembrete
   cobranca
+  geral
 }
 
 enum NotificationChannel {
   whatsapp
+  push
 }
 
 enum NotificationStatus {
@@ -421,6 +423,7 @@ model NotificationLog {
   canal     NotificationChannel
   status    NotificationStatus
   conteudo  String
+  lida      Boolean             @default(false)
   enviadoEm DateTime            @default(now()) @map("enviado_em")
 
   cliente Client @relation(fields: [clienteId], references: [id])

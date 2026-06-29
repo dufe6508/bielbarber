@@ -98,6 +98,21 @@ function montarPayload(event: NotificationEvent): Payload {
   }
 }
 
+function eventoParaTipo(
+  event: NotificationEvent
+): "confirmacao" | "lembrete" | "cobranca" | "geral" {
+  switch (event.type) {
+    case "agendamento_confirmado": return "confirmacao";
+    case "lembrete_horario":
+    case "waitlist_horario_livre": return "lembrete";
+    case "cobranca_emitida":
+    case "cobranca_lembrete":
+    case "cobranca_confirmada":
+    case "assinatura_vencendo": return "cobranca";
+    default: return "geral";
+  }
+}
+
 // R$ no padrão BR (1.234,50).
 function reais(v: number): string {
   return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -149,8 +164,11 @@ export async function sendPushToClient(
   });
   if (assinaturas.length === 0) return;
 
-  const payload = JSON.stringify(montarPayload(event));
+  const p = montarPayload(event);
+  const payload = JSON.stringify(p);
+  const conteudo = `${p.title} — ${p.body}`;
 
+  let enviouAlgum = false;
   await Promise.all(
     assinaturas.map(async (s) => {
       try {
@@ -158,6 +176,7 @@ export async function sendPushToClient(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           payload
         );
+        enviouAlgum = true;
       } catch (err) {
         // 404/410 = assinatura morta (navegador desinstalado/expirou) → desativa.
         const status = (err as { statusCode?: number })?.statusCode;
@@ -172,4 +191,17 @@ export async function sendPushToClient(
       }
     })
   );
+
+  // Registra no inbox do cliente (aparece no sininho).
+  if (enviouAlgum) {
+    await prisma.notificationLog.create({
+      data: {
+        clienteId,
+        tipo: eventoParaTipo(event),
+        canal: "push",
+        status: "enviado",
+        conteudo,
+      },
+    });
+  }
 }
