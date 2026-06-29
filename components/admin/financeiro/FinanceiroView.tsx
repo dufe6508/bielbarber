@@ -336,8 +336,8 @@ function ResumoTab({
                     "mt-1 text-[11px] font-medium",
                     h.destaque
                       ? h.delta.positivo
-                        ? "text-emerald-300"
-                        : "text-primary-foreground/80"
+                        ? "text-emerald-300 dark:text-emerald-700"
+                        : "text-primary-foreground/70 dark:text-foreground/50"
                       : h.delta.positivo
                         ? "text-emerald-600 dark:text-emerald-400"
                         : "text-destructive"

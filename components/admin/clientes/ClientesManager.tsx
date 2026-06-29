@@ -34,14 +34,6 @@ function aniversarioHoje(mesDia: string | null): boolean {
   return mesDia === hoje;
 }
 
-function ResumoStat({ rotulo, valor }: { rotulo: string; valor: number }) {
-  return (
-    <div className="rounded-xl border border-border bg-card px-3 py-2.5 shadow-xs">
-      <p className="font-mono text-lg font-semibold tabular-nums text-foreground">{valor}</p>
-      <p className="text-[11px] text-muted-foreground">{rotulo}</p>
-    </div>
-  );
-}
 
 export function ClientesManager({ clientes }: { clientes: ClienteAdmin[] }) {
   const [lista, setLista] = useState(clientes);
@@ -62,16 +54,6 @@ export function ClientesManager({ clientes }: { clientes: ClienteAdmin[] }) {
     });
   }, [lista, busca, filtro]);
 
-  const resumo = useMemo(
-    () => ({
-      mensalistas: lista.filter((c) => c.mensalista).length,
-      assinaturas: lista.filter((c) => c.assinatura).length,
-      bloqueados: lista.filter((c) => c.bloqueado).length,
-      ativos: lista.reduce((s, c) => s + c.agendamentosAtivos, 0),
-    }),
-    [lista]
-  );
-
   function aplicarPatch(id: string, p: PatchCliente) {
     setLista((prev) => prev.map((c) => (c.id === id ? { ...c, ...p } : c)));
   }
@@ -86,14 +68,6 @@ export function ClientesManager({ clientes }: { clientes: ClienteAdmin[] }) {
 
   return (
     <div>
-      {/* Resumo — totais do banco */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <ResumoStat rotulo="Mensalistas" valor={resumo.mensalistas} />
-        <ResumoStat rotulo="Assinaturas" valor={resumo.assinaturas} />
-        <ResumoStat rotulo="Agend. ativos" valor={resumo.ativos} />
-        <ResumoStat rotulo="Bloqueados" valor={resumo.bloqueados} />
-      </div>
-
       {/* Busca */}
       <div className="relative mb-3">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -170,7 +144,7 @@ export function ClientesManager({ clientes }: { clientes: ClienteAdmin[] }) {
                       <span>·</span>
                       <span>{c.totalAgendamentos} agend.</span>
                       {c.agendamentosAtivos > 0 && (
-                        <span className="inline-flex items-center gap-1 text-primary dark:text-primary-foreground">
+                        <span className="inline-flex items-center gap-1 text-success-muted-foreground">
                           <CalendarClock className="size-3" /> {c.agendamentosAtivos} ativo
                           {c.agendamentosAtivos > 1 ? "s" : ""}
                         </span>

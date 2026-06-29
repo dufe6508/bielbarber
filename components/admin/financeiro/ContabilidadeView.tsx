@@ -228,10 +228,10 @@ export function ContabilidadeView({ mes }: { mes: string }) {
         <FluxoCaixaChart dados={dados.fluxo} />
       </motion.section>
 
-      {/* Despesas por categoria */}
+      {/* Despesas — lista por nome */}
       <motion.section variants={fadeUp} className="rounded-2xl border border-border bg-card p-4 shadow-xs md:p-5">
-        <h3 className="mb-3 font-heading text-base font-semibold tracking-tight text-foreground">Despesas por categoria</h3>
-        <CategoriaBars dados={dados.categorias} />
+        <h3 className="mb-3 font-heading text-base font-semibold tracking-tight text-foreground">Despesas do mês</h3>
+        <DespesaBars despesas={despesas} />
       </motion.section>
 
       {/* Modais */}
@@ -333,22 +333,25 @@ function Chip({ rotulo, valor, icone: Icone }: { rotulo: string; valor: string; 
   );
 }
 
-function CategoriaBars({ dados }: { dados: { categoria: Categoria; total: number }[] }) {
-  if (!dados.length) return <p className="py-6 text-center text-sm text-muted-foreground">Sem despesas no mês.</p>;
-  const max = Math.max(...dados.map((d) => d.total));
+function DespesaBars({ despesas }: { despesas: Despesa[] }) {
+  if (!despesas.length) return <p className="py-6 text-center text-sm text-muted-foreground">Sem despesas no mês.</p>;
+  const max = Math.max(...despesas.map((d) => d.valor));
   return (
     <ul className="space-y-2.5">
-      {dados.map((d, i) => (
-        <li key={d.categoria}>
+      {despesas.map((d, i) => (
+        <li key={d.id}>
           <div className="mb-1 flex items-baseline justify-between gap-2">
-            <span className="truncate text-sm font-medium text-foreground">{catLabel(d.categoria)}</span>
-            <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">{formatarPreco(d.total)}</span>
+            <div className="min-w-0 flex-1">
+              <span className="truncate text-sm font-medium text-foreground">{d.nome}</span>
+              <span className="ml-1.5 text-[11px] text-muted-foreground/70">{catLabel(d.categoria)}</span>
+            </div>
+            <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">{formatarPreco(d.valor)}</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <motion.div
               className="h-full rounded-full bg-primary"
               initial={{ width: 0 }}
-              animate={{ width: `${(d.total / max) * 100}%` }}
+              animate={{ width: `${(d.valor / max) * 100}%` }}
               transition={{ duration: 0.7, delay: 0.1 + i * 0.05, ease: [0.22, 1, 0.36, 1] }}
             />
           </div>

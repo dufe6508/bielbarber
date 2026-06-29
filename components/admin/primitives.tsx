@@ -181,11 +181,11 @@ export function Pill({
   tom?: "neutro" | "verde" | "amber" | "vermelho" | "azul";
 }) {
   const tons: Record<string, string> = {
-    neutro: "bg-neutral-muted text-neutral-muted-foreground",
+    neutro: "border border-border bg-muted/60 text-foreground/70",
     verde: "bg-success-muted text-success-muted-foreground",
-    amber: "bg-danger-muted text-danger-muted-foreground",
+    amber: "bg-amber-500/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
     vermelho: "bg-danger-muted text-danger-muted-foreground",
-    azul: "bg-primary/15 text-primary dark:text-primary-foreground",
+    azul: "bg-foreground/[0.08] text-foreground/80 dark:bg-white/10 dark:text-white/85",
   };
   return (
     <span

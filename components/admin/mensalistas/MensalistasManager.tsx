@@ -11,6 +11,7 @@ import {
   Phone,
   CalendarClock,
   UserMinus,
+  Scissors,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminModal, Campo, inputCls } from "@/components/admin/AdminModal";
@@ -177,7 +178,8 @@ export function MensalistasManager() {
                   <p className="font-mono text-lg font-semibold tabular-nums text-foreground">
                     {formatarPreco(m.totalCiclo)}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Scissors className="size-3" />
                     {m.atendimentosCiclo} no ciclo
                   </p>
                 </div>
