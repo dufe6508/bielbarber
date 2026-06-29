@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendPushToClient } from "@/lib/notifications/push";
+import { notify } from "@/lib/notifications/notify";
 import { dataISOLocal } from "@/lib/utils/format";
 
 // Avisa a fila de espera daquela data que abriu um horário.
@@ -12,7 +12,7 @@ async function avisarListaEspera(data: Date): Promise<void> {
   const iso = dataISOLocal(data);
   await Promise.all(
     naFila.map((w) =>
-      sendPushToClient(w.clienteId, {
+      notify({
         type: "waitlist_horario_livre",
         date: iso,
         clienteId: w.clienteId,
@@ -88,6 +88,7 @@ export async function PATCH(
       where: { id },
       data: { rating, ratingComentario: comentario, ratingEm: new Date() },
     });
+    void notify({ type: "avaliacao_recebida", appointmentId: id });
     return NextResponse.json({ ok: true, rating });
   }
 
@@ -112,6 +113,7 @@ export async function PATCH(
       where: { id },
       data: { checkinEm: new Date() },
     });
+    void notify({ type: "checkin_realizado", appointmentId: id });
     return NextResponse.json({ ok: true, checkinEm: atualizado.checkinEm });
   }
 
@@ -136,6 +138,8 @@ export async function PATCH(
       where: { id },
       data: { status: "cancelado" },
     });
+    // Cliente cancelou → confirma p/ ele + avisa o admin.
+    void notify({ type: "agendamento_cancelado", appointmentId: id, porCliente: true });
     // Abriu horário → notifica quem está na fila daquele dia.
     await avisarListaEspera(agendamento.data);
     return NextResponse.json({ ok: true, status: atualizado.status });
@@ -171,6 +175,7 @@ export async function PATCH(
       where: { id },
       data: { data: new Date(data), horarioInicio: horario },
     });
+    void notify({ type: "agendamento_remarcado", appointmentId: id });
     return NextResponse.json({
       ok: true,
       data: atualizado.data,

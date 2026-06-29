@@ -10,6 +10,8 @@ import {
   setGaleriaVisivel,
 } from "@/lib/utils/slots";
 import { getPerfil, setPerfil } from "@/lib/perfil";
+import { notify } from "@/lib/notifications/notify";
+import { dataISOLocal } from "@/lib/utils/format";
 
 // GET — configurações do painel (horizonte + fidelidade + perfil).
 export async function GET() {
@@ -41,7 +43,14 @@ export async function PUT(request: Request) {
         { status: 400 }
       );
     }
+    const anterior = await getHorizonteDias();
     await setHorizonteDias(dias);
+    // Ampliou a janela de agendamento → avisa os clientes que abriu agenda.
+    if (dias > anterior) {
+      const ate = new Date();
+      ate.setDate(ate.getDate() + dias);
+      void notify({ type: "agenda_liberada", ateData: dataISOLocal(ate) });
+    }
   }
 
   if (body?.fidelidadeMeta !== undefined || body?.fidelidadeRecompensa !== undefined) {

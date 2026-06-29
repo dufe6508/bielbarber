@@ -10,6 +10,7 @@ const FLAGS = [
   "promocao",
   "assinaturaVencendo",
   "estoqueNovo",
+  "sistemaAtivo",
 ] as const;
 
 async function clientePorTelefone(telefone: string) {
@@ -38,9 +39,14 @@ export async function PATCH(request: Request) {
   const cliente = await clientePorTelefone(telefone);
   if (!cliente) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
 
-  const data: Record<string, boolean> = {};
+  const data: Record<string, boolean | number | null> = {};
   for (const f of FLAGS) {
     if (typeof b?.[f] === "boolean") data[f] = b[f];
+  }
+  // Quiet hours (0-23) ou null para desligar.
+  for (const q of ["quietInicio", "quietFim"] as const) {
+    if (b?.[q] === null) data[q] = null;
+    else if (typeof b?.[q] === "number" && b[q] >= 0 && b[q] <= 23) data[q] = b[q];
   }
 
   const prefs = await prisma.notificationPreference.upsert({

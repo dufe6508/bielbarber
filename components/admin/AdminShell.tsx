@@ -8,6 +8,7 @@ import { LogOut, Loader2, MapPin, MoreHorizontal, X } from "lucide-react";
 import { navAdmin, rotaAtivaAdmin } from "@/lib/navAdmin";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { cn } from "@/lib/utils";
 
 // Itens primários no bottom nav (mobile). O resto vai pro sheet "Mais".
@@ -135,8 +136,17 @@ export function AdminShell({
                 {perfil.nome}
               </span>
             </div>
+            <NotificationCenter audiencia="admin" className="ml-auto" />
           </div>
         </header>
+
+        {/* Sino (desktop) — fixo no canto superior direito */}
+        <div className="fixed top-4 right-4 z-40 hidden md:block">
+          <NotificationCenter
+            audiencia="admin"
+            className="size-10 rounded-xl border border-sidebar-border bg-card shadow-md hover:bg-accent"
+          />
+        </div>
 
         <main className="relative flex-1 overflow-x-hidden pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0">
           {children}

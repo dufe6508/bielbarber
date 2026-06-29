@@ -52,3 +52,22 @@ export async function ativarPush(telefone: string): Promise<void> {
     // best-effort: ignora falhas de push
   }
 }
+
+// Desativa o push deste navegador: cancela a assinatura local e a marca inativa
+// no backend. Best-effort (não lança).
+export async function desativarPush(): Promise<void> {
+  try {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    await fetch("/api/push/unsubscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+    await sub.unsubscribe();
+  } catch {
+    // best-effort
+  }
+}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getFidelidadeMeta } from "@/lib/utils/slots";
+import { notify } from "@/lib/notifications/notify";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -56,10 +57,17 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (carimbar) {
     const meta = await getFidelidadeMeta();
     const novo = ag.cliente.carimbos + 1;
+    const completou = novo >= meta;
     // Atingiu a meta → zera (recomeça o cartão).
     await prisma.client.update({
       where: { id: ag.cliente.id },
-      data: { carimbos: novo >= meta ? 0 : novo },
+      data: { carimbos: completou ? 0 : novo },
+    });
+    void notify({
+      type: "fidelidade_carimbo",
+      clienteId: ag.cliente.id,
+      carimbos: completou ? meta : novo,
+      faltam: completou ? 0 : meta - novo,
     });
   }
 

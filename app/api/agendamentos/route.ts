@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
-import { sendPushToClient } from "@/lib/notifications/push";
+import { notify } from "@/lib/notifications/notify";
 
 import { z } from "zod";
 
@@ -157,8 +157,8 @@ export async function POST(request: Request) {
     // Invalida o cache de slots da data agendada
     revalidateTag(`slots-${data}`, {});
 
-    // Push de confirmação (best-effort — no-op se o cliente ainda não assinou)
-    void sendPushToClient(agendamento.clienteId, {
+    // Notifica cliente (confirmação) + admin (novo agendamento). Best-effort.
+    void notify({
       type: "agendamento_confirmado",
       appointmentId: agendamento.id,
     });

@@ -3,6 +3,7 @@ import { SidebarNav } from "@/components/SidebarNav";
 import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { getGaleriaVisivel } from "@/lib/utils/slots";
 
 export default async function ClienteLayout({
@@ -23,8 +24,12 @@ export default async function ClienteLayout({
           <TopBar />
 
           <main className="relative flex-1 overflow-x-hidden pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
-            {/* Toggle tema — desktop only, fixo no canto superior direito */}
-            <div className="fixed top-4 right-4 z-40 hidden md:flex">
+            {/* Sino + tema — desktop only, fixo no canto superior direito */}
+            <div className="fixed top-4 right-4 z-40 hidden items-center gap-1.5 md:flex">
+              <NotificationCenter
+                audiencia="cliente"
+                className="size-10 rounded-xl border border-border bg-card shadow-md hover:bg-accent"
+              />
               <ThemeToggle className="size-10 rounded-xl border border-border bg-card text-muted-foreground shadow-md hover:text-foreground hover:bg-accent" />
             </div>
             {children}

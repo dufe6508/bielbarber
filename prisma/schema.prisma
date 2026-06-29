@@ -87,6 +87,29 @@ enum NotificationStatus {
   falhou
 }
 
+// ─── Central de notificações (inbox interna) ────────────────────────────────
+enum NotificationAudience {
+  cliente
+  admin
+}
+
+enum NotificationCategory {
+  agenda
+  pagamentos
+  mensalistas
+  assinaturas
+  loja
+  sistema
+  promocoes
+}
+
+enum NotificationPriority {
+  baixa
+  normal
+  alta
+  urgente
+}
+
 // ─── Modelos ──────────────────────────────────────────────────────────────────
 
 model Client {
@@ -111,6 +134,7 @@ model Client {
   mensalidade            Subscription?
   cobrancas              SubscriptionCharge[]
   notificacoes           NotificationLog[]
+  notificacoesInbox      Notification[]
   pushSubscriptions      PushSubscription[]
   preferenciaNotificacao NotificationPreference?
   fotos                  ClientPhoto[]
@@ -158,6 +182,8 @@ model Appointment {
   ratingEm         DateTime?         @map("rating_em")
   // Check-in digital: marcado quando cliente toca "Cheguei!".
   checkinEm        DateTime?         @map("checkin_em")
+  // Lembretes já disparados (minutos antes: 1440/120/30) — dedup do cron.
+  lembretes        Int[]             @default([]) @map("lembretes_enviados")
   criadoEm         DateTime          @default(now()) @map("criado_em")
 
   cliente   Client               @relation(fields: [clienteId], references: [id])
@@ -428,6 +454,33 @@ model NotificationLog {
   @@map("log_notificacoes")
 }
 
+// Central de notificações — inbox persistente que o sino lê. Push é só um canal
+// de entrega adicional; a verdade (histórico, lido/não-lido, fixado) vive aqui.
+// audiencia=admin → clienteId null (barbeiro é usuário único). audiencia=cliente
+// → clienteId preenchido (identidade resolvida pelo telefone, sem login).
+model Notification {
+  id         String               @id @default(uuid())
+  audiencia  NotificationAudience
+  clienteId  String?              @map("cliente_id")
+  categoria  NotificationCategory
+  tipo       String // chave do evento ("agendamento_confirmado")
+  titulo     String
+  mensagem   String
+  prioridade NotificationPriority @default(normal)
+  lida       Boolean              @default(false)
+  fixada     Boolean              @default(false)
+  actionUrl  String?              @map("action_url")
+  metadata   Json? // { appointmentId, chargeId, ... }
+  lidaEm     DateTime?            @map("lida_em")
+  criadoEm   DateTime             @default(now()) @map("criado_em")
+
+  cliente Client? @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([audiencia, lida, criadoEm])
+  @@index([clienteId, criadoEm])
+  @@map("notificacoes")
+}
+
 // ─── Sprint 1: push notifications (base estrutural, sem envio ainda) ────────
 model PushSubscription {
   id        String   @id @default(uuid())
@@ -455,6 +508,13 @@ model NotificationPreference {
   promocao           Boolean @default(false)
   assinaturaVencendo Boolean @default(true) @map("assinatura_vencendo")
   estoqueNovo        Boolean @default(false) @map("estoque_novo")
+  // Central de notificações: avisos de sistema (bloqueio, mensagens do admin).
+  sistemaAtivo       Boolean @default(true)  @map("sistema_ativo")
+  // Canal e-mail: dormente (sem infra de envio ainda) — flag pronta p/ futuro.
+  emailAtivo         Boolean @default(false) @map("email_ativo")
+  // Quiet hours (0-23): não disparar push neste intervalo. Null = sem silêncio.
+  quietInicio        Int?    @map("quiet_inicio")
+  quietFim           Int?    @map("quiet_fim")
 
   cliente Client @relation(fields: [clienteId], references: [id])
 

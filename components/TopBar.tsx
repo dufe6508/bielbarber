@@ -1,6 +1,7 @@
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AdminSecretLogo } from "@/components/AdminSecretLogo";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 // Barra superior — só no mobile (md:hidden). No desktop a SidebarNav assume.
 export function TopBar() {
@@ -23,7 +24,10 @@ export function TopBar() {
             </span>
           </span>
         </AdminSecretLogo>
-        <ThemeToggle className="ml-auto text-muted-foreground hover:bg-muted hover:text-foreground" />
+        <div className="ml-auto flex items-center gap-0.5">
+          <NotificationCenter audiencia="cliente" />
+          <ThemeToggle className="text-muted-foreground hover:bg-muted hover:text-foreground" />
+        </div>
       </div>
     </header>
   );

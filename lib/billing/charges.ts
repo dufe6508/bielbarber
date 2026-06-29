@@ -1,6 +1,6 @@
 import type { Prisma, ChargeMethod, SubscriptionCharge } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendPushToClient } from "@/lib/notifications/push";
+import { notify } from "@/lib/notifications/notify";
 import { criarPreferencia } from "@/lib/mercadopago";
 
 // ─── Motor de cobrança de mensalidade ───────────────────────────────────────
@@ -93,7 +93,7 @@ export async function emitirCobranca(
   // Cria a preferência de pagamento no MP (no-op silencioso sem credencial).
   await garantirPreferencia(charge.id);
 
-  void sendPushToClient(sub.clienteId, {
+  void notify({
     type: "cobranca_emitida",
     chargeId: charge.id,
     valor,
@@ -186,7 +186,7 @@ export async function confirmarPagamento(
     });
   });
 
-  void sendPushToClient(charge.clienteId, {
+  void notify({
     type: "cobranca_confirmada",
     chargeId: charge.id,
     valor: Number(charge.valor),
@@ -214,7 +214,7 @@ export async function reenviarCobranca(chargeId: string): Promise<void> {
     where: { id: chargeId },
     data: { ultimoLembrete: new Date() },
   });
-  void sendPushToClient(charge.clienteId, {
+  void notify({
     type: "cobranca_lembrete",
     chargeId: charge.id,
     valor: Number(charge.valor),
@@ -241,7 +241,7 @@ export async function processarVencimentos(): Promise<{
       where: { id: c.id },
       data: { status: "vencido", ultimoLembrete: new Date() },
     });
-    void sendPushToClient(c.clienteId, {
+    void notify({
       type: "cobranca_lembrete",
       chargeId: c.id,
       valor: Number(c.valor),
@@ -263,7 +263,7 @@ export async function processarVencimentos(): Promise<{
       where: { id: c.id },
       data: { ultimoLembrete: new Date() },
     });
-    void sendPushToClient(c.clienteId, {
+    void notify({
       type: "cobranca_lembrete",
       chargeId: c.id,
       valor: Number(c.valor),

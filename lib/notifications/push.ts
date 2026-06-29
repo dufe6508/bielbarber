@@ -1,7 +1,9 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
-import { EVENTO_PREFERENCIA, type NotificationEvent } from "./events";
+import type { PrefFlag } from "./events";
+import type { PushExtras } from "./catalog";
 
+// Entrega de Web Push — UM canal do dispatcher (lib/notifications/notify.ts).
 // VAPID — gere um par com `npx web-push generate-vapid-keys` e configure no .env.
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
@@ -16,112 +18,39 @@ function configurar(): boolean {
   return true;
 }
 
-type PushAction = { action: string; title: string };
-type Payload = {
+export type PushPayload = {
   title: string;
   body: string;
   url: string;
-  // Agrupa notificações do mesmo assunto (uma substitui a outra em vez de empilhar).
-  tag?: string;
-  // Botões de ação na notificação (ex.: "Pagar agora").
-  actions?: PushAction[];
-  // Mantém a notificação visível até o usuário interagir (cobranças importantes).
-  requireInteraction?: boolean;
-};
+} & PushExtras;
 
-// Traduz um evento na notificação visível (título, corpo, deep link de destino).
-function montarPayload(event: NotificationEvent): Payload {
-  switch (event.type) {
-    case "agendamento_confirmado":
-      return {
-        title: "Agendamento confirmado",
-        body: "Seu horário está reservado. Toque para ver os detalhes.",
-        url: "/meus-agendamentos",
-      };
-    case "lembrete_horario":
-      return {
-        title: "Seu horário está chegando",
-        body: `Faltam ${event.minutesBefore} min para o seu corte.`,
-        url: "/meus-agendamentos",
-      };
-    case "promocao":
-      return {
-        title: "Promoção na Biel Barber",
-        body: event.message,
-        url: event.deepLink || "/",
-      };
-    case "assinatura_vencendo":
-      return {
-        title: "Sua mensalidade está fechando",
-        body: `Faltam ${event.daysLeft} dia(s) para o fechamento do ciclo.`,
-        url: "/mensalista",
-      };
-    case "estoque_novo":
-      return {
-        title: "Novidade na loja",
-        body: "Chegou um produto novo. Confira!",
-        url: `/loja/${event.slug}`,
-      };
-    case "waitlist_horario_livre":
-      return {
-        title: "Liberou um horário!",
-        body: "Abriu vaga no dia que você queria. Corre que é por ordem de chegada.",
-        url: "/agendar",
-      };
-    case "cobranca_emitida":
-      return {
-        title: "💈 Mensalidade disponível",
-        body: `Sua mensalidade de ${reais(event.valor)} já pode ser paga. Toque em Pagar agora.`,
-        url: "/mensalista",
-        tag: "cobranca-mensalidade",
-        actions: [{ action: "pagar", title: "Pagar agora" }],
-        requireInteraction: true,
-      };
-    case "cobranca_lembrete":
-      return {
-        title: event.vencido ? "⚠️ Mensalidade vencida" : "🔔 Lembrete de mensalidade",
-        body: event.vencido
-          ? `Sua mensalidade de ${reais(event.valor)} está vencida. Pague para voltar a agendar.`
-          : `Não esqueça: mensalidade de ${reais(event.valor)} aguardando pagamento.`,
-        url: "/mensalista",
-        tag: "cobranca-mensalidade",
-        actions: [{ action: "pagar", title: "Pagar agora" }],
-        requireInteraction: true,
-      };
-    case "cobranca_confirmada":
-      return {
-        title: "✅ Pagamento confirmado",
-        body: `Recebemos sua mensalidade de ${reais(event.valor)}. Obrigado! Já pode agendar de novo.`,
-        url: "/mensalista",
-        tag: "cobranca-mensalidade",
-      };
-  }
-}
-
-// R$ no padrão BR (1.234,50).
-function reais(v: number): string {
-  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Hora atual cai dentro do silêncio (quiet hours) do cliente?
+// Suporta intervalo que cruza a meia-noite (ex.: 22h → 8h).
+function dentroSilencio(inicio: number | null, fim: number | null): boolean {
+  if (inicio == null || fim == null) return false;
+  const h = new Date().getHours();
+  return inicio <= fim ? h >= inicio && h < fim : h >= inicio || h < fim;
 }
 
 // Envia push para todas as assinaturas ativas do cliente, respeitando a
-// preferência do tipo de evento. No-op silencioso se o VAPID não estiver configurado.
-export async function sendPushToClient(
+// preferência do tipo (prefFlag) e o silêncio noturno. No-op se VAPID ausente.
+export async function enviarPushParaCliente(
   clienteId: string,
-  event: NotificationEvent
+  payload: PushPayload,
+  prefFlag?: PrefFlag
 ): Promise<void> {
   if (!configurar()) {
-    console.log("[push] VAPID ausente — pulando envio", clienteId, event.type);
+    console.log("[push] VAPID ausente — pulando", clienteId);
     return;
   }
 
-  // Respeita a preferência do cliente para esse tipo de evento.
   const pref = await prisma.notificationPreference.findUnique({
     where: { clienteId },
   });
   if (pref) {
     if (!pref.pushAtivo) return;
-    const flag = EVENTO_PREFERENCIA[event.type];
-    if (pref[flag] === false) return;
+    if (prefFlag && pref[prefFlag] === false) return;
+    if (dentroSilencio(pref.quietInicio, pref.quietFim)) return;
   }
 
   const assinaturas = await prisma.pushSubscription.findMany({
@@ -129,17 +58,17 @@ export async function sendPushToClient(
   });
   if (assinaturas.length === 0) return;
 
-  const payload = JSON.stringify(montarPayload(event));
+  const corpo = JSON.stringify(payload);
 
   await Promise.all(
     assinaturas.map(async (s) => {
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          payload
+          corpo
         );
       } catch (err) {
-        // 404/410 = assinatura morta (navegador desinstalado/expirou) → desativa.
+        // 404/410 = assinatura morta → desativa.
         const status = (err as { statusCode?: number })?.statusCode;
         if (status === 404 || status === 410) {
           await prisma.pushSubscription.update({
