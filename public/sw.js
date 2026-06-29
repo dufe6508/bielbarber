@@ -18,19 +18,19 @@ self.addEventListener("push", (event) => {
   const acoes = Array.isArray(dados.actions) && dados.actions.length > 0
     ? dados.actions.slice(0, 2)
     : [{ action: "abrir", title: "Abrir app" }];
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body: dados.body || "",
-      icon: "/icon-192.png",
-      badge: "/badge-96.png",
-      tag: dados.tag || undefined,
-      renotify: Boolean(dados.tag),
-      requireInteraction: Boolean(dados.requireInteraction),
-      vibrate: [60, 40, 60],
-      actions: acoes,
-      data: { url: dados.url || "/" },
-    })
-  );
+  const opts = {
+    body: dados.body || "",
+    icon: dados.icon || "/icon-rounded-192.png",
+    badge: "/icon-rounded-192.png",
+    tag: dados.tag || undefined,
+    renotify: Boolean(dados.tag),
+    requireInteraction: Boolean(dados.requireInteraction),
+    vibrate: [60, 40, 60],
+    actions: acoes,
+    data: { url: dados.url || "/" },
+  };
+  if (dados.image) opts.image = dados.image;
+  event.waitUntil(self.registration.showNotification(title, opts));
 });
 
 // Toque na notificação (ou num botão de ação) → abre/foca a URL de destino.

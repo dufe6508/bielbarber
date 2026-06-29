@@ -14,6 +14,8 @@ export type PushExtras = {
   tag?: string;
   actions?: { action: string; title: string }[];
   requireInteraction?: boolean;
+  image?: string;
+  icon?: string;
 };
 
 // Uma notificação concreta a gravar/entregar. clienteId ausente num spec de
@@ -154,18 +156,25 @@ export async function montarSpecs(event: NotificationEvent): Promise<Notificatio
         event.minutesBefore >= 60
           ? `Seu horário é hoje às ${ag.horarioInicio}.`
           : `Seu horário começa em ${event.minutesBefore} minutos.`;
+      const icone = event.minutesBefore <= 30 ? "⏰" : event.minutesBefore <= 120 ? "✂️" : "📅";
       return [
         {
           audiencia: "cliente",
           clienteId: ag.clienteId,
           categoria: "agenda",
           prioridade: "normal",
-          titulo: "Lembrete de corte",
+          titulo: `${icone} Biel Barber — Lembrete`,
           mensagem: txt,
           actionUrl: "/meus-agendamentos",
           metadata: { appointmentId: ag.id, minutesBefore: event.minutesBefore },
           prefFlag: "lembrete",
-          push: { tag: `lembrete-${ag.id}` },
+          push: {
+            tag: `lembrete-${ag.id}`,
+            actions: [
+              { action: "abrir", title: "Ver horário" },
+              { action: "agendar", title: "Remarcar" },
+            ],
+          },
         },
       ];
     }
@@ -230,14 +239,18 @@ export async function montarSpecs(event: NotificationEvent): Promise<Notificatio
           clienteId: await clienteDaCobranca(event.chargeId),
           categoria: "pagamentos",
           prioridade: "alta",
-          titulo: "Mensalidade disponível",
-          mensagem: `Sua mensalidade de ${formatarPreco(event.valor)} já pode ser paga.`,
+          titulo: "✂️ Biel Barber — Mensalidade",
+          mensagem: `Fechamento do mês: ${formatarPreco(event.valor)}. Pague via Pix ou cartão.`,
           actionUrl: "/mensalista",
           metadata: { chargeId: event.chargeId },
           prefFlag: "assinaturaVencendo",
           push: {
             tag: "cobranca-mensalidade",
-            actions: [{ action: "pagar", title: "Pagar agora" }],
+            image: `${process.env.NEXT_PUBLIC_APP_URL}/banner-notificacao.jpg`,
+            actions: [
+              { action: "pagar", title: "💳 Pagar agora" },
+              { action: "abrir", title: "Ver detalhes" },
+            ],
             requireInteraction: true,
           },
         },
@@ -250,16 +263,20 @@ export async function montarSpecs(event: NotificationEvent): Promise<Notificatio
           clienteId: await clienteDaCobranca(event.chargeId),
           categoria: "pagamentos",
           prioridade: event.vencido ? "urgente" : "alta",
-          titulo: event.vencido ? "Mensalidade vencida" : "Lembrete de mensalidade",
+          titulo: event.vencido ? "⚠️ Mensalidade vencida" : "🔔 Lembrete de mensalidade",
           mensagem: event.vencido
-            ? `Sua mensalidade de ${formatarPreco(event.valor)} está vencida. Pague para voltar a agendar.`
-            : `Mensalidade de ${formatarPreco(event.valor)} aguardando pagamento.`,
+            ? `${formatarPreco(event.valor)} em atraso. Regularize para continuar agendando.`
+            : `${formatarPreco(event.valor)} aguardando pagamento. Vence em breve.`,
           actionUrl: "/mensalista",
           metadata: { chargeId: event.chargeId, vencido: event.vencido },
           prefFlag: "assinaturaVencendo",
           push: {
             tag: "cobranca-mensalidade",
-            actions: [{ action: "pagar", title: "Pagar agora" }],
+            image: `${process.env.NEXT_PUBLIC_APP_URL}/banner-notificacao.jpg`,
+            actions: [
+              { action: "pagar", title: "💳 Pagar agora" },
+              { action: "abrir", title: "Ver detalhes" },
+            ],
             requireInteraction: true,
           },
         },
