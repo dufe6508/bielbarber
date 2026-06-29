@@ -4,24 +4,27 @@ import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { PushInit } from "@/components/PushInit";
 import { getGaleriaVisivel } from "@/lib/utils/slots";
+import { getPerfil } from "@/lib/perfil";
 
 export default async function ClienteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const galeriaVisivel = await getGaleriaVisivel();
+  const [galeriaVisivel, perfil] = await Promise.all([getGaleriaVisivel(), getPerfil()]);
   return (
     <QueryProvider>
+      <PushInit />
       <div className="flex min-h-[100dvh] w-full">
         {/* Desktop: navegação lateral */}
-        <SidebarNav galeriaVisivel={galeriaVisivel} />
+        <SidebarNav galeriaVisivel={galeriaVisivel} nome={perfil.nome} local={perfil.local} />
 
         {/* Coluna principal */}
         <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
           {/* Mobile: barra superior */}
-          <TopBar />
+          <TopBar nome={perfil.nome} />
 
           <main className="relative flex-1 overflow-x-hidden pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
             {/* Sino + tema — desktop only, fixo no canto superior direito */}
