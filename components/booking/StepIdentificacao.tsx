@@ -6,7 +6,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, MapPin } from "lucide-react";
 import { useBooking } from "@/lib/store/booking";
 import { formatarTelefone, telefoneNumeros } from "@/lib/utils/format";
-import { lembrarTelefone } from "@/lib/utils/telefone";
+import {
+  lembrarNome,
+  lembrarTelefone,
+  nomeLembrado,
+  telefoneLembrado,
+} from "@/lib/utils/telefone";
 import { Logo } from "@/components/Logo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +24,16 @@ export function StepIdentificacao() {
   const { nome, telefone, setNome, setTelefone } = useBooking();
   const digitos = telefoneNumeros(telefone);
   const completo = digitos.length >= 10;
+
+  // Pré-preenche nome + telefone do último agendamento (localStorage). Só no mount,
+  // e só se o cliente ainda não digitou nada nesta sessão.
+  useEffect(() => {
+    const tel = telefoneLembrado();
+    const n = nomeLembrado();
+    if (tel && !telefone) setTelefone(formatarTelefone(tel));
+    if (n && !nome) setNome(n);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debounce: só busca quando o número para de mudar por 250ms — evita disparar
   // a cada dígito (10º e 11º) enquanto o cliente ainda digita.
@@ -46,10 +61,13 @@ export function StepIdentificacao() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rec]);
 
-  // Lembra o telefone pra pré-preencher em "Meus agendamentos" / "Mensalista"
+  // Lembra telefone + nome pra pré-preencher no próximo agendamento
   useEffect(() => {
     if (completo) lembrarTelefone(digitos);
   }, [completo, digitos]);
+  useEffect(() => {
+    if (nome.trim().length >= 2) lembrarNome(nome);
+  }, [nome]);
 
   const reconhecido = completo && rec?.encontrado === true;
 
