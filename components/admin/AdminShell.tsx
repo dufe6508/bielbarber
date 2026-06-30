@@ -32,6 +32,22 @@ export function AdminShell({
 
   useEffect(() => { ativarPushAdmin(); }, []);
 
+  // Sessão deslizante: revalida/renova o cookie ao montar e sempre que o app
+  // volta ao foco (reabrir o PWA). Mantém o admin logado até o logout manual.
+  useEffect(() => {
+    const pingar = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/admin/session", { cache: "no-store" }).catch(() => {});
+    };
+    pingar();
+    document.addEventListener("visibilitychange", pingar);
+    window.addEventListener("focus", pingar);
+    return () => {
+      document.removeEventListener("visibilitychange", pingar);
+      window.removeEventListener("focus", pingar);
+    };
+  }, []);
+
   const primarios = navAdmin.filter((i) => PRIMARIOS.includes(i.href));
   const secundarios = navAdmin.filter((i) => !PRIMARIOS.includes(i.href));
   const atualTitulo =

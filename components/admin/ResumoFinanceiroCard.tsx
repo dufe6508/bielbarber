@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { Wallet, Scissors, TrendingUp, XCircle } from "lucide-react";
 import type { ResumoFinanceiro } from "@/lib/admin/metrics";
 import { formatarPreco } from "@/lib/utils/format";
+import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { cn } from "@/lib/utils";
 
 type Periodo = "dia" | "semana" | "mes";
@@ -15,8 +16,10 @@ const ABAS: { id: Periodo; rotulo: string }[] = [
   { id: "mes", rotulo: "Mês" },
 ];
 
-// Card único de resumo financeiro com alternância Dia / Semana / Mês.
-// Os três períodos vêm pré-calculados do servidor — alternar é instantâneo.
+// Resumo financeiro retrátil com alternância Dia / Semana / Mês. Fica recolhido
+// por padrão (só o total do dia aparece no cabeçalho) e expande sob demanda —
+// informação disponível sem poluir a tela. Os três períodos vêm pré-calculados
+// do servidor, então alternar é instantâneo.
 export function ResumoFinanceiroCard({
   dia,
   semana,
@@ -30,17 +33,19 @@ export function ResumoFinanceiroCard({
   const dados = aba === "dia" ? dia : aba === "semana" ? semana : mes;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-xs md:p-5">
-      {/* Cabeçalho + segmented control */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Wallet className="size-4" />
-          </span>
-          <h2 className="font-heading text-base font-semibold tracking-tight text-foreground">
-            Resumo financeiro
-          </h2>
-        </div>
+    <CollapsibleCard
+      titulo="Resumo financeiro"
+      subtitulo="Dia · semana · mês"
+      icone={<Wallet className="size-4" />}
+      resumo={
+        <span className="font-mono font-semibold tabular-nums text-foreground">
+          {formatarPreco(dia.total)}
+        </span>
+      }
+      defaultOpen={false}
+    >
+      {/* Segmented control */}
+      <div className="flex justify-center">
         <div className="inline-flex rounded-full border border-border bg-muted/40 p-0.5">
           {ABAS.map((t) => {
             const on = aba === t.id;
@@ -49,7 +54,7 @@ export function ResumoFinanceiroCard({
                 key={t.id}
                 onClick={() => setAba(t.id)}
                 className={cn(
-                  "relative rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  "relative rounded-full px-3.5 py-1 text-xs font-medium transition-colors",
                   on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -68,7 +73,7 @@ export function ResumoFinanceiroCard({
       </div>
 
       {/* Faturamento total — número grande */}
-      <div className="mt-4">
+      <div className="mt-4 text-center">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
           Faturamento {aba === "dia" ? "de hoje" : aba === "semana" ? "da semana" : "do mês"}
         </p>
@@ -104,7 +109,7 @@ export function ResumoFinanceiroCard({
           <Fonte rotulo="Mensalistas" valor={dados.mensalistas} />
         </div>
       )}
-    </div>
+    </CollapsibleCard>
   );
 }
 

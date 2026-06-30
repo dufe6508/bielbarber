@@ -112,5 +112,17 @@ export function useNotificacaoMutations(
     onSuccess: invalidar,
   });
 
-  return { patch, remover, marcarTodas };
+  // Limpa a conversa de uma vez (apaga todas, exceto as fixadas).
+  const limparTudo = useMutation({
+    mutationFn: async () => {
+      await fetch(`${base}/limpar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo({})),
+      });
+    },
+    onSuccess: invalidar,
+  });
+
+  return { patch, remover, marcarTodas, limparTudo };
 }

@@ -19,6 +19,7 @@ import {
   BellOff,
   Megaphone,
   ArrowLeft,
+  Eraser,
 } from "lucide-react";
 import {
   useNotificacoes,
@@ -69,13 +70,18 @@ export function NotificationCenter({
 }) {
   const router = useRouter();
   const { data, telefone } = useNotificacoes(audiencia);
-  const { patch, remover, marcarTodas } = useNotificacaoMutations(audiencia, telefone);
+  const { patch, remover, marcarTodas, limparTudo } = useNotificacaoMutations(
+    audiencia,
+    telefone
+  );
   const [aberto, setAberto] = useState(false);
   const [vista, setVista] = useState<"lista" | "prefs" | "broadcast">("lista");
   const [filtro, setFiltro] = useState<NotificacaoCategoria | "todas">("todas");
+  const [confirmandoLimpar, setConfirmandoLimpar] = useState(false);
 
   function abrir() {
     setVista("lista");
+    setConfirmandoLimpar(false);
     setAberto(true);
   }
   const subtitulo = vista === "prefs" ? "Preferências" : "Enviar aviso";
@@ -85,6 +91,13 @@ export function NotificationCenter({
   const filtrados = filtro === "todas" ? itens : itens.filter((n) => n.categoria === filtro);
   // Categorias presentes (chips só do que existe).
   const categoriasPresentes = Array.from(new Set(itens.map((n) => n.categoria)));
+  // Apagáveis = não fixadas (o "Limpar conversa" preserva as fixadas).
+  const apagaveis = itens.filter((n) => !n.fixada).length;
+
+  function limparConversa() {
+    limparTudo.mutate();
+    setConfirmandoLimpar(false);
+  }
 
   function abrirItem(n: Notificacao) {
     if (!n.lida) patch.mutate({ id: n.id, lida: true });
@@ -134,48 +147,38 @@ export function NotificationCenter({
             >
 
               {/* Header */}
-              <div className="flex shrink-0 items-center justify-between gap-2 px-5 pb-3 pt-3.5">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-5 pb-3.5 pt-4">
                 {vista === "lista" ? (
                   <>
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span className="font-heading text-lg font-semibold tracking-tight text-foreground">
                         Notificações
                       </span>
                       {naoLidas > 0 && (
-                        <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                        <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 py-0.5 font-mono text-[11px] font-semibold leading-none text-primary-foreground">
                           {naoLidas}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      {naoLidas > 0 && (
-                        <button
-                          onClick={() => marcarTodas.mutate()}
-                          aria-label="Marcar todas como lidas"
-                          title="Marcar todas como lidas"
-                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        >
-                          <CheckCheck className="size-3.5 shrink-0" />
-                          <span className="hidden sm:inline">Marcar todas</span>
-                        </button>
-                      )}
+                    <div className="flex items-center gap-0.5">
                       <button
                         onClick={() => setVista(audiencia === "admin" ? "broadcast" : "prefs")}
                         aria-label={audiencia === "admin" ? "Enviar aviso" : "Preferências"}
-                        className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        title={audiencia === "admin" ? "Enviar aviso" : "Preferências"}
+                        className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       >
                         {audiencia === "admin" ? (
-                          <Megaphone className="size-4.5" />
+                          <Megaphone className="size-[18px]" />
                         ) : (
-                          <Settings className="size-4.5" />
+                          <Settings className="size-[18px]" />
                         )}
                       </button>
                       <button
                         onClick={() => setAberto(false)}
-                        className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         aria-label="Fechar"
                       >
-                        <X className="size-4.5" />
+                        <X className="size-[18px]" />
                       </button>
                     </div>
                   </>
@@ -215,7 +218,7 @@ export function NotificationCenter({
 
               {/* Filtros por categoria */}
               {vista === "lista" && categoriasPresentes.length > 1 && (
-                <div className="flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-3 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   <Chip ativo={filtro === "todas"} onClick={() => setFiltro("todas")}>
                     Todas
                   </Chip>
@@ -251,6 +254,69 @@ export function NotificationCenter({
                   </ul>
                 )}
               </div>
+              )}
+
+              {/* Footer — ações em massa (marcar lidas / limpar conversa) */}
+              {vista === "lista" && itens.length > 0 && (
+                <div className="shrink-0 border-t border-border/60 bg-card px-3 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
+                  <AnimatePresence mode="wait" initial={false}>
+                    {confirmandoLimpar ? (
+                      <motion.div
+                        key="confirma"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="pl-1.5 text-xs text-muted-foreground">
+                          Apagar {apagaveis} {apagaveis === 1 ? "mensagem" : "mensagens"}?
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setConfirmandoLimpar(false)}
+                            className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={limparConversa}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                          >
+                            <Trash2 className="size-3.5" />
+                            Apagar tudo
+                          </button>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="acoes"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <button
+                          onClick={() => marcarTodas.mutate()}
+                          disabled={naoLidas === 0}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                        >
+                          <CheckCheck className="size-3.5" />
+                          Marcar todas
+                        </button>
+                        <button
+                          onClick={() => setConfirmandoLimpar(true)}
+                          disabled={apagaveis === 0}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:pointer-events-none disabled:opacity-40"
+                        >
+                          <Eraser className="size-3.5" />
+                          Limpar conversa
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               )}
             </motion.div>
           </motion.div>
@@ -300,13 +366,13 @@ function Item({
   return (
     <li
       className={cn(
-        "group relative flex gap-3 px-4 py-3 transition-colors hover:bg-accent/40",
-        !n.lida && "bg-accent/25"
+        "group relative flex gap-3 py-3.5 pl-5 pr-3 transition-colors hover:bg-accent/40",
+        !n.lida && "bg-accent/20"
       )}
     >
-      {/* Ponto de não-lida — fino indicador na borda */}
+      {/* Barra de não-lida — indicador vertical fino na borda */}
       {!n.lida && (
-        <span className="absolute left-1.5 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-red-500" />
+        <span className="absolute left-0 top-3.5 bottom-3.5 w-[3px] rounded-full bg-primary" />
       )}
 
       {/* Ícone da categoria */}
@@ -316,45 +382,54 @@ function Item({
           urgente ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
         )}
       >
-        <Icone className="size-4.5" strokeWidth={2} />
+        <Icone className="size-[18px]" strokeWidth={2} />
       </span>
 
       <div className="min-w-0 flex-1">
-        {/* Conteúdo (clicável) */}
+        {/* Linha superior: título + horário */}
         <button onClick={onAbrir} className="block w-full text-left">
-          <div className="flex items-center gap-1.5">
-            {n.fixada && <Pin className="size-3 shrink-0 fill-current text-muted-foreground" />}
-            <span className={cn("truncate text-foreground", !n.lida ? "font-semibold" : "font-medium")}>
-              {n.titulo}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              {n.fixada && <Pin className="size-3 shrink-0 fill-current text-muted-foreground" />}
+              <span
+                className={cn(
+                  "truncate text-sm text-foreground",
+                  !n.lida ? "font-semibold" : "font-medium"
+                )}
+              >
+                {n.titulo}
+              </span>
+            </div>
+            <span className="mt-0.5 shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground/60">
+              {tempoRelativo(n.criadoEm)}
             </span>
           </div>
-          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{n.mensagem}</p>
+          <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">
+            {n.mensagem}
+          </p>
         </button>
 
-        {/* Rodapé: horário + ações discretas */}
-        <div className="mt-1.5 flex items-center justify-between">
-          <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/60">
-            {tempoRelativo(n.criadoEm)}
-          </span>
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={onFixar}
-              aria-label={n.fixada ? "Desafixar" : "Fixar"}
-              className={cn(
-                "inline-flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-background",
-                n.fixada ? "text-foreground" : "text-muted-foreground/60 hover:text-foreground"
-              )}
-            >
-              <Pin className={cn("size-3.5", n.fixada && "fill-current")} />
-            </button>
-            <button
-              onClick={onRemover}
-              aria-label="Excluir"
-              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-background hover:text-red-500"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
+        {/* Ações discretas — aparecem no hover/foco */}
+        <div className="mt-2 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+          <button
+            onClick={onFixar}
+            aria-label={n.fixada ? "Desafixar" : "Fixar"}
+            className={cn(
+              "inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors hover:bg-background",
+              n.fixada ? "text-foreground" : "text-muted-foreground/70 hover:text-foreground"
+            )}
+          >
+            <Pin className={cn("size-3.5", n.fixada && "fill-current")} />
+            {n.fixada ? "Fixada" : "Fixar"}
+          </button>
+          <button
+            onClick={onRemover}
+            aria-label="Excluir"
+            className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:bg-red-500/10 hover:text-red-500"
+          >
+            <Trash2 className="size-3.5" />
+            Excluir
+          </button>
         </div>
       </div>
     </li>

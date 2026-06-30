@@ -12,12 +12,40 @@ type BIPEvent = Event & {
 
 type Modo = "android" | "ios-safari" | "ios-outro" | null;
 
-const DISPENSADO = "pwa-install-dispensado";
-const PRAZO = 14 * 24 * 60 * 60 * 1000; // reaparece após 14 dias
+// Dispensa "inteligente": em vez de sumir pra sempre, o aviso volta em intervalos
+// crescentes enquanto o app não estiver instalado. Não é invasivo (espera o
+// próximo intervalo), mas o usuário nunca perde a opção de instalar.
+const DISPENSADO = "pwa-install-snooze"; // { count, ts }
+const DIA_MS = 24 * 60 * 60 * 1000;
+const ESCALA_DIAS = [3, 7, 14, 30]; // após a 1ª, 2ª, 3ª, 4ª+ dispensa
+
+type Snooze = { count: number; ts: number };
+
+function lerSnooze(): Snooze {
+  try {
+    const raw = localStorage.getItem(DISPENSADO);
+    if (raw) {
+      const v = JSON.parse(raw) as Partial<Snooze>;
+      if (typeof v.count === "number" && typeof v.ts === "number") {
+        return { count: v.count, ts: v.ts };
+      }
+    }
+  } catch {
+    // valor legado/corrompido → ignora
+  }
+  return { count: 0, ts: 0 };
+}
 
 function dispensadoRecente(): boolean {
-  const t = Number(localStorage.getItem(DISPENSADO) || 0);
-  return t > 0 && Date.now() - t < PRAZO;
+  const { count, ts } = lerSnooze();
+  if (!ts) return false;
+  const dias = ESCALA_DIAS[Math.min(count - 1, ESCALA_DIAS.length - 1)] ?? ESCALA_DIAS[0];
+  return Date.now() - ts < dias * DIA_MS;
+}
+
+function registrarDispensa(): void {
+  const { count } = lerSnooze();
+  localStorage.setItem(DISPENSADO, JSON.stringify({ count: count + 1, ts: Date.now() }));
 }
 
 // iOS esconde-se de várias formas: iPhone/iPad clássico no UA, e iPad recente
@@ -81,7 +109,7 @@ export function InstallPrompt() {
   }, []);
 
   function dispensar() {
-    localStorage.setItem(DISPENSADO, String(Date.now()));
+    registrarDispensa();
     setVisivel(false);
     setSheet(false);
   }
@@ -92,7 +120,7 @@ export function InstallPrompt() {
     const { outcome } = await evento.userChoice;
     setEvento(null);
     setVisivel(false);
-    if (outcome === "dismissed") localStorage.setItem(DISPENSADO, String(Date.now()));
+    if (outcome === "dismissed") registrarDispensa();
   }
 
   const subtitulo =

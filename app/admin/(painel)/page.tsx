@@ -25,6 +25,7 @@ import {
 } from "@/lib/admin/metrics";
 import { resumoContabil } from "@/lib/admin/accounting";
 import { ResumoFinanceiroCard } from "@/components/admin/ResumoFinanceiroCard";
+import { ProximosAtendimentos } from "@/components/admin/ProximosAtendimentos";
 import { formatarPreco } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -71,24 +72,23 @@ export default async function DashboardPage({
         acao={<MonthSelector atual={mesParam} />}
       />
 
-      {/* Resumo financeiro com alternância dia/semana/mês */}
-      <div className="mb-5">
+      {/* Hero — faturamento do mês */}
+      <StatCard
+        rotulo="Faturamento do mês"
+        valor={formatarPreco(fonte.total)}
+        icone={Wallet}
+        hint={`${atend.concluidos} atendimentos concluídos`}
+        href="/admin/financeiro"
+        destaque
+      />
+
+      {/* Resumo financeiro retrátil — logo abaixo do faturamento, recolhido por padrão */}
+      <div className="mt-3">
         <ResumoFinanceiroCard dia={resDia} semana={resSemana} mes={resMes} />
       </div>
 
-      {/* Só o essencial — 1 hero + 3 métricas */}
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-        <div className="col-span-2">
-          <StatCard
-            rotulo="Faturamento do mês"
-            valor={formatarPreco(fonte.total)}
-            icone={Wallet}
-            hint={`${atend.concluidos} atendimentos concluídos`}
-            href="/admin/financeiro"
-            destaque
-          />
-        </div>
-
+      {/* Métricas de apoio */}
+      <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-3">
         <StatCard
           rotulo="Lucro líquido"
           valor={formatarPreco(conta.lucroLiquido)}
@@ -121,56 +121,19 @@ export default async function DashboardPage({
       </div>
 
       <div className="mt-4">
-        <SectionCard titulo="Próximos atendimentos">
-          {proximos.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhum agendamento futuro.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {proximos.map((a) => {
-                const [ano, mes, dia] = a.data.split("-").map(Number);
-                const label = new Date(ano, mes - 1, dia).toLocaleDateString("pt-BR", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "short",
-                });
-                return (
-                  <li key={a.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                    <div className="flex w-24 shrink-0 flex-col items-end">
-                      <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                        {a.horarioInicio}
-                      </span>
-                      <span className="text-[11px] capitalize text-muted-foreground">{label}</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">{a.cliente}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {a.servicos.join(", ")}
-                      </p>
-                    </div>
-                    <Link
-                      href={`/admin/agendamentos`}
-                      className="shrink-0 font-mono text-sm tabular-nums text-muted-foreground hover:text-foreground"
-                    >
-                      {a.valorTotal > 0
-                        ? `R$ ${a.valorTotal.toFixed(2).replace(".", ",")}`
-                        : "—"}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <div className="mt-3 border-t border-border pt-3">
+        <SectionCard
+          titulo="Próximos atendimentos"
+          acao={
             <Link
               href="/admin/agendamentos"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              Ver todos os agendamentos
-              <ChevronRight className="size-3" />
+              Ver todos
+              <ChevronRight className="size-3.5" />
             </Link>
-          </div>
+          }
+        >
+          <ProximosAtendimentos itens={proximos} />
         </SectionCard>
       </div>
     </AdminPage>

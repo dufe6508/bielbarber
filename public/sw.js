@@ -20,8 +20,11 @@ self.addEventListener("push", (event) => {
     : [{ action: "abrir", title: "Abrir app" }];
   const opts = {
     body: dados.body || "",
-    icon: dados.icon || "/biel-logo.png",
-    badge: "/biel-logo.png",
+    // Ícone grande (colorido) no corpo da notificação.
+    icon: dados.icon || "/icon-192.png",
+    // Badge = ícone da barra de status no Android. Precisa ser monocromático
+    // (branco + transparência) — o sistema usa só o canal alfa como máscara.
+    badge: "/badge-mono.png",
     tag: dados.tag || undefined,
     renotify: Boolean(dados.tag),
     requireInteraction: Boolean(dados.requireInteraction),

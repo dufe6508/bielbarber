@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
 import { notify } from "@/lib/notifications/notify";
+import { sincronizarAgenda } from "@/lib/calendar";
 
 import { z } from "zod";
 
@@ -183,6 +184,10 @@ export async function POST(request: Request) {
       type: "agendamento_confirmado",
       appointmentId: agendamento.id,
     });
+
+    // Sincroniza com agendas nativas (admin + cliente). No-op enquanto não houver
+    // provider de API habilitado — a arquitetura já fica pronta para ativar depois.
+    void sincronizarAgenda(agendamento.id, ["admin", "cliente"]);
 
     // Código curto para o ticket
     const codigo = agendamento.id.slice(0, 8).toUpperCase();

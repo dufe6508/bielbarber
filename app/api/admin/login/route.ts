@@ -3,7 +3,7 @@ import {
   verificarSenha,
   criarTokenSessao,
   ADMIN_COOKIE,
-  ADMIN_COOKIE_MAX_AGE,
+  opcoesCookieAdmin,
 } from "@/lib/auth";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -46,12 +46,6 @@ export async function POST(request: Request) {
   tentativas.delete(ip);
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(ADMIN_COOKIE, criarTokenSessao(), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: ADMIN_COOKIE_MAX_AGE,
-  });
+  res.cookies.set(ADMIN_COOKIE, criarTokenSessao(), opcoesCookieAdmin());
   return res;
 }

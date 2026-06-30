@@ -45,6 +45,15 @@ export function criarTokenSessao(): string {
   return `${payload}.${assinar(payload)}`;
 }
 
+// Idade do token (ms desde a emissão), ou null se malformado.
+function idadeTokenMs(token: string): number | null {
+  const i = token.lastIndexOf(".");
+  if (i < 0) return null;
+  const emitidoEm = Number(token.slice(0, i).split(".")[1]);
+  if (!Number.isFinite(emitidoEm)) return null;
+  return Date.now() - emitidoEm;
+}
+
 export function tokenValido(token: string | undefined | null): boolean {
   if (!token) return false;
   const i = token.lastIndexOf(".");
@@ -53,9 +62,9 @@ export function tokenValido(token: string | undefined | null): boolean {
   const assinatura = token.slice(i + 1);
   if (!comparaConstante(assinatura, assinar(payload))) return false;
   // Expira no servidor junto com o cookie — token roubado não vale pra sempre.
-  const emitidoEm = Number(payload.split(".")[1]);
-  if (!Number.isFinite(emitidoEm)) return false;
-  return Date.now() - emitidoEm < ADMIN_COOKIE_MAX_AGE * 1000;
+  const idade = idadeTokenMs(token);
+  if (idade === null) return false;
+  return idade < ADMIN_COOKIE_MAX_AGE * 1000;
 }
 
 export async function verificarSenha(senha: unknown): Promise<boolean> {
@@ -88,10 +97,37 @@ export async function definirSenha(nova: string): Promise<void> {
   });
 }
 
+// Opções padrão do cookie de sessão — uma fonte só (login, refresh, logout).
+export function opcoesCookieAdmin() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: ADMIN_COOKIE_MAX_AGE,
+  };
+}
+
 // Usa em Server Components, layouts e Route Handlers do admin.
 export async function getAdminSession(): Promise<boolean> {
   const store = await cookies();
   return tokenValido(store.get(ADMIN_COOKIE)?.value);
+}
+
+// Sessão deslizante: chamável de Route Handlers (onde cookies().set funciona).
+// Revalida o cookie e, se passou de metade da janela, reemite um token novo —
+// assim a sessão se mantém ativa indefinidamente enquanto o painel for usado,
+// expirando só após inatividade real (> ADMIN_COOKIE_MAX_AGE) ou logout manual.
+export async function renovarSessaoAdmin(): Promise<boolean> {
+  const store = await cookies();
+  const atual = store.get(ADMIN_COOKIE)?.value;
+  if (!tokenValido(atual)) return false;
+  const idade = atual ? idadeTokenMs(atual) : null;
+  // Só reescreve quando vale a pena (evita Set-Cookie a cada poll de 60s).
+  if (idade !== null && idade > (ADMIN_COOKIE_MAX_AGE * 1000) / 2) {
+    store.set(ADMIN_COOKIE, criarTokenSessao(), opcoesCookieAdmin());
+  }
+  return true;
 }
 
 export async function requireAdmin(): Promise<void> {
