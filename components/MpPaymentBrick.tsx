@@ -40,8 +40,8 @@ export function MpPaymentBrick({
   if (!PUB) {
     return (
       <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
-        Pagamento online indisponível no momento. Fale com a barbearia para
-        quitar a mensalidade.
+        Pagamento online indisponível no momento. Tente mais tarde ou fale com
+        a barbearia.
       </p>
     );
   }
