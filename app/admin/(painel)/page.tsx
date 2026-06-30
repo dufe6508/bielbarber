@@ -21,8 +21,10 @@ import {
   serieReceitaPorDia,
   clientesAtivos,
   proximosAtendimentos,
+  resumoFinanceiro,
 } from "@/lib/admin/metrics";
 import { resumoContabil } from "@/lib/admin/accounting";
+import { ResumoFinanceiroCard } from "@/components/admin/ResumoFinanceiroCard";
 import { formatarPreco } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -46,14 +48,18 @@ export default async function DashboardPage({
   const mesParam = `${ano}-${String(mesIndex + 1).padStart(2, "0")}`;
   const { desde, ate } = janelaMes(ano, mesIndex);
 
-  const [fonte, atend, serie, ativos, conta, proximos] = await Promise.all([
-    receitaPorFonte(desde, ate),
-    atendimentoNoPeriodo(desde, ate),
-    serieReceitaPorDia(desde, ate),
-    clientesAtivos(2),
-    resumoContabil(ano, mesIndex),
-    proximosAtendimentos(8),
-  ]);
+  const [fonte, atend, serie, ativos, conta, proximos, resDia, resSemana, resMes] =
+    await Promise.all([
+      receitaPorFonte(desde, ate),
+      atendimentoNoPeriodo(desde, ate),
+      serieReceitaPorDia(desde, ate),
+      clientesAtivos(2),
+      resumoContabil(ano, mesIndex),
+      proximosAtendimentos(8),
+      resumoFinanceiro("dia"),
+      resumoFinanceiro("semana"),
+      resumoFinanceiro("mes"),
+    ]);
 
   const ags = "/admin/agendamentos";
 
@@ -64,6 +70,11 @@ export default async function DashboardPage({
         descricao="O essencial do mês. Toque nos cards para abrir os detalhes."
         acao={<MonthSelector atual={mesParam} />}
       />
+
+      {/* Resumo financeiro com alternância dia/semana/mês */}
+      <div className="mb-5">
+        <ResumoFinanceiroCard dia={resDia} semana={resSemana} mes={resMes} />
+      </div>
 
       {/* Só o essencial — 1 hero + 3 métricas */}
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">

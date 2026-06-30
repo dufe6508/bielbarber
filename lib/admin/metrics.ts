@@ -163,6 +163,75 @@ export async function atendimentoNoPeriodo(
   };
 }
 
+// Resumo financeiro de um período (dia | semana | mês), respeitando janela
+// arbitrária — diferente de receitaPorFonte, que é sempre mensal. Usa data do
+// corte (@db.Date) com janela UTC para evitar off-by-one de timezone.
+export type ResumoFinanceiro = {
+  periodo: Periodo;
+  total: number;
+  servicos: number;
+  loja: number;
+  assinaturas: number;
+  mensalistas: number;
+  atendimentos: number; // concluídos
+  cancelados: number;
+  agendados: number;
+  ticket: number;
+};
+
+export async function resumoFinanceiro(
+  periodo: Periodo,
+  ref = new Date()
+): Promise<ResumoFinanceiro> {
+  const desdeLocal = inicioPeriodo(periodo, ref);
+  // Janela UTC para Appointment.data (chave de dia), derivada das datas locais.
+  const desdeUTC = new Date(
+    Date.UTC(desdeLocal.getFullYear(), desdeLocal.getMonth(), desdeLocal.getDate())
+  );
+  const now = new Date();
+  const ateUTC = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  );
+
+  const [ags, pedidos, pacotes, subs] = await Promise.all([
+    prisma.appointment.findMany({
+      where: { data: { gte: desdeUTC, lt: ateUTC } },
+      select: { valorTotal: true, status: true },
+    }),
+    prisma.order.findMany({
+      where: { statusPagamento: "pago", criadoEm: { gte: desdeLocal } },
+      select: { total: true },
+    }),
+    prisma.clientPackage.findMany({
+      where: { compradoEm: { gte: desdeLocal } },
+      select: { pacote: { select: { preco: true } } },
+    }),
+    prisma.subscription.findMany({
+      where: { dataUltimoPagamento: { gte: desdeLocal } },
+      select: { valorUltimoPagamento: true },
+    }),
+  ]);
+
+  const concluidos = ags.filter((a) => a.status === "concluido");
+  const servicos = concluidos.reduce((s, a) => s + dec(a.valorTotal), 0);
+  const loja = pedidos.reduce((s, p) => s + dec(p.total), 0);
+  const assinaturas = pacotes.reduce((s, p) => s + dec(p.pacote.preco), 0);
+  const mensalistas = subs.reduce((s, x) => s + dec(x.valorUltimoPagamento), 0);
+
+  return {
+    periodo,
+    total: servicos + loja + assinaturas + mensalistas,
+    servicos,
+    loja,
+    assinaturas,
+    mensalistas,
+    atendimentos: concluidos.length,
+    cancelados: ags.filter((a) => a.status === "cancelado").length,
+    agendados: ags.filter((a) => a.status === "agendado").length,
+    ticket: concluidos.length ? servicos / concluidos.length : 0,
+  };
+}
+
 // Janela [início, fim) de um mês (mesIndex 0..11). `fim` é capado em "agora"
 // quando o mês é o corrente — não conta dias futuros.
 export function janelaMes(ano: number, mesIndex: number): { desde: Date; ate: Date } {
