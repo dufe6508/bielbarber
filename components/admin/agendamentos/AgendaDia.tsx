@@ -239,27 +239,27 @@ export function AgendaDia() {
                   {ag ? (
                     <button
                       onClick={() => setAlvo(ag)}
-                      className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-xs transition-all hover:bg-muted/40 hover:shadow-sm active:scale-[0.99]"
+                      className="flex flex-1 flex-col gap-1 overflow-hidden rounded-xl border border-border bg-card px-3 py-2 text-left shadow-xs transition-all hover:bg-muted/40 hover:shadow-sm active:scale-[0.99]"
                     >
-                      {/* Esquerda: nome + serviço + telefone */}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold leading-tight text-foreground">
+                      {/* Linha 1: nome + valor */}
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight text-foreground">
                           {ag.cliente.nome}
                         </p>
-                        <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                          <Scissors className="size-3 shrink-0" />
-                          {ag.servicos.join(", ")}
-                          <span className="text-muted-foreground/40">·</span>
-                          {formatarTelefone(ag.cliente.telefone)}
-                        </p>
-                      </div>
-
-                      {/* Direita: valor + pills */}
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <span className="font-mono text-sm font-bold tabular-nums text-foreground">
+                        <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-foreground">
                           {formatarPreco(ag.valorTotal)}
                         </span>
-                        <div className="flex items-center gap-1">
+                      </div>
+
+                      {/* Linha 2: serviço/telefone + status */}
+                      <div className="flex items-center gap-2">
+                        <Scissors className="size-3 shrink-0 text-muted-foreground" />
+                        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                          {ag.servicos.join(", ")}
+                          <span className="mx-1 text-muted-foreground/40">·</span>
+                          {formatarTelefone(ag.cliente.telefone)}
+                        </p>
+                        <div className="flex shrink-0 items-center gap-1">
                           {ag.slots >= 2 && <Pill tom="neutro">2h</Pill>}
                           <Pill tom={STATUS_TOM[ag.status] ?? "neutro"}>
                             {STATUS_ROTULO[ag.status] ?? ag.status}

@@ -66,6 +66,7 @@ export function MensalistasManager() {
   const [modalClientes, setModalClientes] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState("");
   const [clientesResultado, setClientesResultado] = useState<ClienteSimples[]>([]);
+  const [carregandoClientes, setCarregandoClientes] = useState(false);
   const [clientesSelecionados, setClientesSelecionados] = useState<string[]>([]);
   const [diaCobrancaClientes, setDiaCobrancaClientes] = useState<10 | 30>(10);
   const [salvandoClientes, setSalvandoClientes] = useState(false);
@@ -177,28 +178,41 @@ export function MensalistasManager() {
     }
   }
 
-  // Busca clientes existentes para o modal de seleção (debounce)
+  // Carrega todos os clientes ao abrir o modal (lista pronta pra seleção)
   useEffect(() => {
     if (!modalClientes) return;
-    const termo = buscaCliente.trim();
+    let cancelado = false;
     const t = setTimeout(async () => {
-      if (termo.length < 2) {
-        setClientesResultado([]);
-        return;
-      }
+      setCarregandoClientes(true);
       try {
-        const res = await fetch(`/api/admin/clientes?busca=${encodeURIComponent(termo)}`);
+        const res = await fetch("/api/admin/clientes");
         const dados = await res.json();
+        if (cancelado) return;
         const telefonesExistentes = new Set(lista.map((m) => m.telefone));
         setClientesResultado(
           (Array.isArray(dados) ? dados : []).filter(
             (c: ClienteSimples) => !telefonesExistentes.has(c.telefone)
           )
         );
-      } catch { /* ignore */ }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [buscaCliente, modalClientes, lista]);
+      } catch { /* ignore */ } finally {
+        if (!cancelado) setCarregandoClientes(false);
+      }
+    }, 0);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [modalClientes, lista]);
+
+  // Filtro local da lista de clientes pela busca
+  const termoBusca = buscaCliente.trim().toLowerCase();
+  const clientesFiltrados = termoBusca
+    ? clientesResultado.filter(
+        (c) =>
+          c.nome.toLowerCase().includes(termoBusca) ||
+          c.telefone.replace(/\D/g, "").includes(termoBusca.replace(/\D/g, ""))
+      )
+    : clientesResultado;
 
   async function adicionarClientes() {
     if (clientesSelecionados.length === 0) return;
@@ -418,55 +432,79 @@ export function MensalistasManager() {
             />
           </div>
 
-          {buscaCliente.trim().length >= 2 && clientesResultado.length === 0 && (
+          {carregandoClientes ? (
+            <div className="space-y-1.5">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
+              ))}
+            </div>
+          ) : clientesResultado.length === 0 ? (
+            <p className="py-3 text-center text-sm text-muted-foreground">
+              Nenhum cliente disponível para virar mensalista.
+            </p>
+          ) : clientesFiltrados.length === 0 ? (
             <p className="py-3 text-center text-sm text-muted-foreground">
               Nenhum cliente encontrado.
             </p>
-          )}
-
-          {clientesResultado.length > 0 && (
-            <ul className="max-h-56 space-y-1.5 overflow-y-auto">
-              {clientesResultado.map((c) => {
-                const sel = clientesSelecionados.includes(c.id);
-                return (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setClientesSelecionados((prev) =>
-                          sel ? prev.filter((id) => id !== c.id) : [...prev, c.id]
-                        )
-                      }
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                        sel
-                          ? "border-primary bg-accent/60"
-                          : "border-border bg-card hover:bg-muted"
-                      )}
-                    >
-                      <span
+          ) : (
+            <>
+              <p className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>
+                  {clientesFiltrados.length} cliente{clientesFiltrados.length > 1 ? "s" : ""}
+                </span>
+                {clientesSelecionados.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setClientesSelecionados([])}
+                    className="font-medium text-foreground/70 hover:text-foreground"
+                  >
+                    Limpar seleção
+                  </button>
+                )}
+              </p>
+              <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+                {clientesFiltrados.map((c) => {
+                  const sel = clientesSelecionados.includes(c.id);
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setClientesSelecionados((prev) =>
+                            sel ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                          )
+                        }
                         className={cn(
-                          "flex size-5 shrink-0 items-center justify-center rounded border transition-colors",
+                          "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
                           sel
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-background"
+                            ? "border-primary bg-accent/60"
+                            : "border-border bg-card hover:bg-muted"
                         )}
                       >
-                        {sel && <Check className="size-3" strokeWidth={3} />}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground">
-                          {c.nome}
+                        <span
+                          className={cn(
+                            "flex size-5 shrink-0 items-center justify-center rounded border transition-colors",
+                            sel
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background"
+                          )}
+                        >
+                          {sel && <Check className="size-3" strokeWidth={3} />}
                         </span>
-                        <span className="block font-mono text-xs tabular-nums text-muted-foreground">
-                          {formatarTelefone(c.telefone)}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-foreground">
+                            {c.nome}
+                          </span>
+                          <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                            {formatarTelefone(c.telefone)}
+                          </span>
                         </span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
 
           <Campo rotulo="Grupo de fechamento">
