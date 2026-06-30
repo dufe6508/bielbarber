@@ -12,7 +12,6 @@ import {
   ShoppingBag,
   Settings,
   Tag,
-  Check,
   CheckCheck,
   Pin,
   Trash2,
@@ -152,10 +151,12 @@ export function NotificationCenter({
                       {naoLidas > 0 && (
                         <button
                           onClick={() => marcarTodas.mutate()}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          aria-label="Marcar todas como lidas"
+                          title="Marcar todas como lidas"
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         >
-                          <CheckCheck className="size-3.5" />
-                          Marcar todas
+                          <CheckCheck className="size-3.5 shrink-0" />
+                          <span className="hidden sm:inline">Marcar todas</span>
                         </button>
                       )}
                       <button
@@ -245,7 +246,6 @@ export function NotificationCenter({
                         onAbrir={() => abrirItem(n)}
                         onFixar={() => patch.mutate({ id: n.id, fixada: !n.fixada })}
                         onRemover={() => remover.mutate(n.id)}
-                        onLer={() => patch.mutate({ id: n.id, lida: true })}
                       />
                     ))}
                   </ul>
@@ -289,23 +289,26 @@ function Item({
   onAbrir,
   onFixar,
   onRemover,
-  onLer,
 }: {
   n: Notificacao;
   onAbrir: () => void;
   onFixar: () => void;
   onRemover: () => void;
-  onLer: () => void;
 }) {
   const { Icone } = CATEGORIAS[n.categoria];
   const urgente = n.prioridade === "urgente" || n.prioridade === "alta";
   return (
     <li
       className={cn(
-        "group relative flex gap-3 px-5 py-3.5 transition-colors hover:bg-accent/40",
+        "group relative flex gap-3 px-4 py-3 transition-colors hover:bg-accent/40",
         !n.lida && "bg-accent/25"
       )}
     >
+      {/* Ponto de não-lida — fino indicador na borda */}
+      {!n.lida && (
+        <span className="absolute left-1.5 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-red-500" />
+      )}
+
       {/* Ícone da categoria */}
       <span
         className={cn(
@@ -316,47 +319,43 @@ function Item({
         <Icone className="size-4.5" strokeWidth={2} />
       </span>
 
-      {/* Conteúdo (clicável) */}
-      <button onClick={onAbrir} className="min-w-0 flex-1 text-left">
-        <div className="flex items-center gap-2">
-          {n.fixada && <Pin className="size-3 shrink-0 fill-current text-muted-foreground" />}
-          <span className="truncate font-medium text-foreground">{n.titulo}</span>
-          {!n.lida && <span className="size-2 shrink-0 rounded-full bg-red-500" />}
-        </div>
-        <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{n.mensagem}</p>
-        <span className="mt-1 inline-block font-mono text-[10px] uppercase tracking-wide text-muted-foreground/60">
-          {tempoRelativo(n.criadoEm)}
-        </span>
-      </button>
+      <div className="min-w-0 flex-1">
+        {/* Conteúdo (clicável) */}
+        <button onClick={onAbrir} className="block w-full text-left">
+          <div className="flex items-center gap-1.5">
+            {n.fixada && <Pin className="size-3 shrink-0 fill-current text-muted-foreground" />}
+            <span className={cn("truncate text-foreground", !n.lida ? "font-semibold" : "font-medium")}>
+              {n.titulo}
+            </span>
+          </div>
+          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{n.mensagem}</p>
+        </button>
 
-      {/* Ações (hover desktop / sempre mobile) */}
-      <div className="flex shrink-0 flex-col items-center gap-1 opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
-        {!n.lida && (
-          <button
-            onClick={onLer}
-            aria-label="Marcar como lida"
-            className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-          >
-            <Check className="size-3.5" />
-          </button>
-        )}
-        <button
-          onClick={onFixar}
-          aria-label={n.fixada ? "Desafixar" : "Fixar"}
-          className={cn(
-            "inline-flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-background",
-            n.fixada ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Pin className={cn("size-3.5", n.fixada && "fill-current")} />
-        </button>
-        <button
-          onClick={onRemover}
-          aria-label="Excluir"
-          className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-red-500"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
+        {/* Rodapé: horário + ações discretas */}
+        <div className="mt-1.5 flex items-center justify-between">
+          <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/60">
+            {tempoRelativo(n.criadoEm)}
+          </span>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={onFixar}
+              aria-label={n.fixada ? "Desafixar" : "Fixar"}
+              className={cn(
+                "inline-flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-background",
+                n.fixada ? "text-foreground" : "text-muted-foreground/60 hover:text-foreground"
+              )}
+            >
+              <Pin className={cn("size-3.5", n.fixada && "fill-current")} />
+            </button>
+            <button
+              onClick={onRemover}
+              aria-label="Excluir"
+              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-background hover:text-red-500"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
     </li>
   );
