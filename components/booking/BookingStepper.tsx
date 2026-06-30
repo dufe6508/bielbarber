@@ -29,7 +29,6 @@ export function BookingStepper({ limite }: { limite: string }) {
   const booking = useBooking();
   const { passo, avancar, voltar, irPara } = booking;
   const [enviando, setEnviando] = useState(false);
-  const [codigo, setCodigo] = useState<string | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const [cobrancaPendente, setCobrancaPendente] = useState(false);
   const [pagamento, setPagamento] = useState<{ chargeId: string; valor: number } | null>(null);
@@ -130,7 +129,6 @@ export function BookingStepper({ limite }: { limite: string }) {
         return;
       }
 
-      setCodigo(dados.codigo);
       // Push best-effort: pede permissão e registra a assinatura sem travar o fluxo.
       void ativarPush(telefoneNumeros(booking.telefone));
       // Pagamento online (pix/cartão): abre o checkout antes do ticket. Sem
@@ -222,8 +220,8 @@ export function BookingStepper({ limite }: { limite: string }) {
     );
   }
 
-  // Tela final — ticket
-  if (passo === 4 && codigo) {
+  // Tela final — ticket (online não retorna código; basta ter chegado ao passo 4)
+  if (passo === 4) {
     return (
       <div className="mx-auto w-full max-w-md px-5 py-8 md:py-16">
         <TicketConfirmacao />

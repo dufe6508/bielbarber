@@ -1,8 +1,12 @@
-import type { Prisma, ChargeMethod, SubscriptionCharge } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { ChargeMethod, SubscriptionCharge } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
 import { criarPreferencia } from "@/lib/mercadopago";
 import { ativarPacote } from "@/lib/packages";
+import { revalidateTag } from "next/cache";
+import { getSlotsDisponiveis, proximaHora } from "@/lib/utils/slots";
+import { sincronizarAgenda } from "@/lib/calendar";
 
 // ─── Motor de cobrança de mensalidade ───────────────────────────────────────
 // Centraliza emissão, confirmação, vencimento e cancelamento de cobranças.
@@ -205,22 +209,33 @@ export async function criarCobrancaPedido(
   return prisma.subscriptionCharge.findUnique({ where: { id: charge.id } }) as Promise<SubscriptionCharge>;
 }
 
-// Cria uma cobrança para um agendamento avulso (pago online), vinculada a ele.
+// Dados da reserva guardados na cobrança até o pagamento confirmar. O horário só
+// vira agendamento de fato em confirmarAgendamentoCharge (após pagar).
+export type ReservaAgendamento = {
+  servicos: { servicoId: string; preco: number }[];
+  data: string; // YYYY-MM-DD
+  horario: string; // HH:00
+  horarioFim: string | null;
+  slots: number;
+};
+
+// Cria a cobrança de um agendamento online ANTES de marcar o horário. A reserva
+// fica no campo `itens`; o appointment nasce só quando o pagamento confirma.
 export async function criarCobrancaAgendamento(
   clienteId: string,
-  agendamentoId: string,
   valor: number,
-  descricao: string
+  descricao: string,
+  reserva: ReservaAgendamento
 ): Promise<SubscriptionCharge> {
   const charge = await prisma.subscriptionCharge.create({
     data: {
       tipo: "agendamento",
       clienteId,
-      agendamentoId,
       valor,
       descricao: descricao.slice(0, 200),
       vencimento: new Date(),
       status: "pendente",
+      itens: reserva as unknown as Prisma.InputJsonValue,
     },
   });
 
@@ -358,30 +373,100 @@ async function confirmarPedidoCharge(
   });
 }
 
-// Confirma uma cobrança de agendamento avulso: baixa o agendamento vinculado.
+// Confirma uma cobrança de agendamento: o horário só é marcado AGORA (após o
+// pagamento). Cria o appointment a partir da reserva guardada e o vincula.
+// Idempotente: se já houver agendamentoId, só garante o status pago.
 async function confirmarAgendamentoCharge(
   charge: SubscriptionCharge,
   opts: ConfirmarOpts
 ): Promise<SubscriptionCharge> {
   const metodo: ChargeMethod = opts.metodo ?? (opts.manual ? "dinheiro" : "outro");
-  return prisma.$transaction(async (tx) => {
-    if (charge.agendamentoId) {
-      await tx.appointment.updateMany({
-        where: { id: charge.agendamentoId, statusPagamento: "pendente" },
-        data: { statusPagamento: "pago" },
-      });
-    }
-    return tx.subscriptionCharge.update({
+
+  const marcarPago = (agendamentoId: string | null) =>
+    prisma.subscriptionCharge.update({
       where: { id: charge.id },
       data: {
         status: "pago",
         pagoEm: new Date(),
         metodo,
+        agendamentoId: agendamentoId ?? charge.agendamentoId,
         mpPaymentId: opts.mpPaymentId ?? charge.mpPaymentId,
         comprovanteUrl: opts.comprovanteUrl ?? charge.comprovanteUrl,
       },
     });
-  });
+
+  // Já tem agendamento (reprocesso) → só confirma pago.
+  if (charge.agendamentoId) {
+    await prisma.appointment.updateMany({
+      where: { id: charge.agendamentoId, statusPagamento: "pendente" },
+      data: { statusPagamento: "pago" },
+    });
+    return marcarPago(charge.agendamentoId);
+  }
+
+  const reserva = charge.itens as unknown as ReservaAgendamento | null;
+  if (!reserva?.servicos?.length) {
+    // Sem reserva (não deveria acontecer) → marca pago e segue; barbeiro vê.
+    return marcarPago(null);
+  }
+
+  const horarios =
+    reserva.slots >= 2 ? [reserva.horario, proximaHora(reserva.horario)] : [reserva.horario];
+
+  try {
+    const ag = await prisma.$transaction(async (tx) => {
+      // Slot ainda livre? (alguém pode ter marcado durante o pagamento)
+      const ocupado = await tx.appointment.findFirst({
+        where: {
+          data: new Date(reserva.data),
+          horarioInicio: { in: horarios },
+          status: { notIn: ["cancelado"] },
+        },
+        select: { id: true },
+      });
+      if (ocupado) throw new Error("SLOT_OCUPADO");
+
+      return tx.appointment.create({
+        data: {
+          clienteId: charge.clienteId,
+          data: new Date(reserva.data),
+          horarioInicio: reserva.horario,
+          slots: reserva.slots,
+          formaPagamento: metodo === "pix" ? "pix" : "cartao",
+          statusPagamento: "pago",
+          valorTotal: charge.valor,
+          servicos: {
+            create: reserva.servicos.map((s) => ({
+              servicoId: s.servicoId,
+              precoNaHora: s.preco,
+            })),
+          },
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    revalidateTag(`slots-${reserva.data}`, {});
+    void notify({ type: "agendamento_confirmado", appointmentId: ag.id });
+    void sincronizarAgenda(ag.id, ["admin", "cliente"]);
+    return marcarPago(ag.id);
+  } catch (err) {
+    // Horário tomado durante o pagamento (raro). Não perde o dinheiro: marca a
+    // cobrança paga e avisa o admin pra reagendar/estornar com o cliente.
+    // ponytail: aceitável p/ volume baixo; reembolso fica manual.
+    console.error("[charges] conflito ao confirmar agendamento", charge.id, err);
+    void notify({ type: "cobranca_confirmada", chargeId: charge.id, valor: Number(charge.valor) });
+    return prisma.subscriptionCharge.update({
+      where: { id: charge.id },
+      data: {
+        status: "pago",
+        pagoEm: new Date(),
+        metodo,
+        descricao: `${charge.descricao ?? "Agendamento"} — CONFLITO DE HORÁRIO, contatar cliente`,
+        mpPaymentId: opts.mpPaymentId ?? charge.mpPaymentId,
+        comprovanteUrl: opts.comprovanteUrl ?? charge.comprovanteUrl,
+      },
+    });
+  }
 }
 
 // Cancela uma cobrança aberta (não paga).

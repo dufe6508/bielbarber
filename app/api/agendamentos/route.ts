@@ -112,7 +112,49 @@ export async function POST(request: Request) {
     0
   );
 
+  const online = formaFinal === "pix" || formaFinal === "cartao";
+
   try {
+    // ─── Pagamento online (pix/cartão): NÃO marca o horário agora ───────────
+    // Cria o cliente + cobrança guardando a reserva. O agendamento nasce só
+    // quando o pagamento confirma (confirmarAgendamentoCharge). Evita segurar
+    // horário de quem desiste no checkout.
+    if (online) {
+      const cliente = await prisma.client.upsert({
+        where: { telefone },
+        update: { nome },
+        create: { nome, telefone },
+        select: { id: true, bloqueado: true },
+      });
+      if (cliente.bloqueado) throw new Error("BLOQUEADO");
+
+      const cobrancaAberta = await prisma.subscriptionCharge.findFirst({
+        where: {
+          clienteId: cliente.id,
+          tipo: "mensalista",
+          status: { in: ["pendente", "vencido"] },
+        },
+        select: { id: true },
+      });
+      if (cobrancaAberta) throw new Error("COBRANCA_PENDENTE");
+
+      const charge = await criarCobrancaAgendamento(
+        cliente.id,
+        valorTotal,
+        servicos.map((s) => s.nome).join(", "),
+        {
+          servicos: servicos.map((s) => ({ servicoId: s.id, preco: Number(s.preco) })),
+          data,
+          horario,
+          horarioFim: slotsNecessarios >= 2 ? proximaHora(horario) : null,
+          slots: slotsNecessarios,
+        }
+      );
+
+      return NextResponse.json({ chargeId: charge.id, valor: valorTotal }, { status: 201 });
+    }
+
+    // ─── Local / mensalista: marca o horário na hora (sem pagamento online) ──
     const agendamento = await prisma.$transaction(async (tx) => {
       // Re-verifica disponibilidade atomicamente (previne double-booking simultâneo).
       const ocupado = await tx.appointment.findFirst({
@@ -197,27 +239,7 @@ export async function POST(request: Request) {
     // Código curto para o ticket
     const codigo = agendamento.id.slice(0, 8).toUpperCase();
 
-    // Pagamento online (pix/cartão): gera a cobrança e devolve o chargeId para
-    // o checkout. Local/mensalista seguem sem cobrança (paga no local / no ciclo).
-    let chargeId: string | null = null;
-    if (formaFinal === "pix" || formaFinal === "cartao") {
-      const descricao = servicos.map((s) => s.nome).join(", ");
-      const charge = await criarCobrancaAgendamento(
-        agendamento.clienteId,
-        agendamento.id,
-        valorTotal,
-        descricao
-      ).catch((e) => {
-        console.error("[agendamentos] falha ao criar cobrança", e);
-        return null;
-      });
-      chargeId = charge?.id ?? null;
-    }
-
-    return NextResponse.json(
-      { id: agendamento.id, codigo, chargeId, valor: valorTotal },
-      { status: 201 }
-    );
+    return NextResponse.json({ id: agendamento.id, codigo }, { status: 201 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "";
     if (msg === "CONFLITO_SLOT") {
