@@ -17,8 +17,6 @@ import {
   Scissors,
   Award,
   Star,
-  MapPin,
-  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
@@ -43,7 +41,6 @@ type Agendamento = {
   valorTotal: string;
   servicos: Servico[];
   rating: number | null;
-  checkinEm: string | null;
 };
 type Resultado = { nome: string; agendamentos: Agendamento[] };
 
@@ -58,11 +55,6 @@ type Visual = {
 
 function capitalizar(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-// Mesmo dia (local) — libera o botão "Cheguei!"
-function ehHoje(data: string): boolean {
-  return rotuloRelativo(data) === "Hoje";
 }
 
 // true quando a data é Hoje ou Amanhã (mostra chip de destaque)
@@ -249,24 +241,6 @@ function CartaoAgendamento({
   const [remarcando, setRemarcando] = useState(false);
   const [avaliando, setAvaliando] = useState(false);
 
-  const checkin = useMutation<unknown, Error, void>({
-    mutationFn: async () => {
-      const res = await fetch(`/api/agendamentos/${a.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao: "checkin", telefone }),
-      });
-      const dados = await res.json();
-      if (!res.ok) throw new Error(dados.error ?? "Erro no check-in.");
-      return dados;
-    },
-    onSuccess: () => {
-      toast.success("Check-in feito. O Biel já sabe que você chegou!");
-      onMudou();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
   const cancelar = useMutation<unknown, Error, void>({
     mutationFn: async () => {
       const res = await fetch(`/api/agendamentos/${a.id}`, {
@@ -291,27 +265,27 @@ function CartaoAgendamento({
         hidden: { opacity: 0, y: 10 },
         show: { opacity: 1, y: 0 },
       }}
-      whileHover={{ y: -2 }}
       transition={{ type: "spring", stiffness: 320, damping: 26 }}
-      className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-primary/[0.05]"
+      className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
       {/* Faixa lateral de status */}
-      <span className={cn("absolute inset-y-0 left-0 w-1.5", v.faixa)} />
+      <span className={cn("absolute inset-y-0 left-0 w-1", v.faixa)} />
 
       <div className="p-4 pl-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
+        {/* Linha 1: data + badge */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
             <span
               className={cn(
-                "flex size-11 shrink-0 items-center justify-center rounded-xl",
+                "flex size-9 shrink-0 items-center justify-center rounded-lg",
                 v.ativo
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground"
               )}
             >
-              <Scissors className="size-5" />
+              <Scissors className="size-4" />
             </span>
-            <div className="leading-tight">
+            <div>
               <div className="flex items-center gap-2">
                 <p className="font-heading text-base font-semibold tracking-tight text-foreground">
                   {capitalizar(formatarDataExtenso(a.data).replace(/\./g, ""))}
@@ -322,34 +296,42 @@ function CartaoAgendamento({
                   </span>
                 )}
               </div>
-              <p className="mt-0.5 flex items-center gap-1 font-mono text-sm tabular-nums text-muted-foreground">
-                <Clock className="size-3.5" aria-hidden="true" />
+              <p className="flex items-center gap-1 font-mono text-sm tabular-nums text-muted-foreground">
+                <Clock className="size-3" aria-hidden="true" />
                 {a.horarioInicio}
               </p>
             </div>
           </div>
-          <span
-            className={cn(
-              "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-              v.badge
-            )}
-          >
-            {v.rotulo}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                v.badge
+              )}
+            >
+              {v.rotulo}
+            </span>
+            <span className="font-mono text-base font-bold tabular-nums text-foreground">
+              {formatarPreco(a.valorTotal)}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-2 border-t border-dashed border-border pt-3">
-          <p className="text-sm text-foreground">
-            {a.servicos.map((s) => s.nome).join(", ")}
-          </p>
-          <span className="font-mono text-base font-bold tabular-nums text-foreground">
-            {formatarPreco(a.valorTotal)}
-          </span>
+        {/* Serviços */}
+        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-dashed border-border pt-3">
+          {a.servicos.map((s) => (
+            <span
+              key={s.nome}
+              className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+            >
+              {s.nome}
+            </span>
+          ))}
         </div>
 
         {/* Ações (só para agendado futuro, até 1h antes) */}
         {v.ativo && v.podeAlterar && (
-          <div className="mt-4 flex gap-2">
+          <div className="mt-3 flex gap-2">
             <button
               type="button"
               onClick={() => setRemarcando((x) => !x)}
@@ -378,30 +360,6 @@ function CartaoAgendamento({
             Alterações encerradas (menos de 1h para o horário).
           </p>
         )}
-
-        {/* Check-in digital — só no dia, enquanto agendado */}
-        {v.ativo &&
-          ehHoje(a.data) &&
-          (a.checkinEm ? (
-            <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-success-muted-foreground">
-              <CheckCircle2 className="size-4" />
-              Check-in feito
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={() => checkin.mutate()}
-              disabled={checkin.isPending}
-              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-[transform,filter] hover:brightness-[1.10] active:scale-[0.98] disabled:opacity-50"
-            >
-              {checkin.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <MapPin className="size-4" />
-              )}
-              Cheguei!
-            </button>
-          ))}
 
         {/* Avaliação pós-corte — só para concluídos */}
         {a.status === "concluido" &&

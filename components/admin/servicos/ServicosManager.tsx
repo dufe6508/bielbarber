@@ -114,10 +114,9 @@ export function ServicosManager() {
   }
 
   async function remover(s: Servico) {
-    if (!confirm(`Remover "${s.nome}"?`)) return;
-    const res = await fetch(`/api/admin/servicos/${s.id}`, { method: "DELETE" });
-    const j = await res.json().catch(() => ({}));
-    if (j.desativado) toast.info("Serviço em uso, foi desativado.");
+    if (!confirm(`Remover permanentemente "${s.nome}"? Esta ação não pode ser desfeita.`)) return;
+    await fetch(`/api/admin/servicos/${s.id}`, { method: "DELETE" });
+    toast.success("Serviço removido.");
     carregar();
   }
 

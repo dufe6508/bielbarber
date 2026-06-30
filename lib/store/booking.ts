@@ -20,7 +20,7 @@ export type FormaPagamento = "pix" | "cartao" | "local" | "mensalista";
 export type MensalistaInfo = { nome: string; telefone: string };
 
 type BookingState = {
-  passo: number; // 0=horário, 1=serviços, 2=identificação, 3=pagamento, 4=ticket
+  passo: number; // 0=serviços, 1=horário, 2=identificação, 3=pagamento, 4=ticket
   servicos: ServicoSelecionado[];
   extras: ExtraSelecionado[]; // produtos do upsell
   data: string | null; // YYYY-MM-DD
@@ -100,7 +100,7 @@ export const useBooking = create<BookingState>((set, get) => ({
   reset: () => set(estadoInicial),
 
   preselecionar: (servicos) =>
-    set({ servicos, data: null, horario: null, horarioFim: null, passo: 0 }),
+    set({ servicos, data: null, horario: null, horarioFim: null, passo: 1 }),
 
   valorTotal: () => {
     const s = get().servicos.reduce((acc, x) => acc + x.preco, 0);

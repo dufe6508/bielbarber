@@ -16,6 +16,9 @@ import {
   Users,
   Receipt,
   BadgeCheck,
+  Search,
+  UserPlus,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminModal, ConfirmDialog, Campo, inputCls } from "@/components/admin/AdminModal";
@@ -38,6 +41,8 @@ type Mensalista = {
   estado: "pago" | "pendente" | "vencido";
 };
 
+type ClienteSimples = { id: string; nome: string; telefone: string };
+
 const ESTADO: Record<
   Mensalista["estado"],
   { rotulo: string; tom: "verde" | "amber" | "vermelho"; icone: typeof Clock }
@@ -57,6 +62,13 @@ export function MensalistasManager() {
   const [diaCobranca, setDiaCobranca] = useState<10 | 30>(10);
   const [salvando, setSalvando] = useState(false);
   const [emitindo, setEmitindo] = useState<string | null>(null);
+  // Modal de seleção de clientes existentes
+  const [modalClientes, setModalClientes] = useState(false);
+  const [buscaCliente, setBuscaCliente] = useState("");
+  const [clientesResultado, setClientesResultado] = useState<ClienteSimples[]>([]);
+  const [clientesSelecionados, setClientesSelecionados] = useState<string[]>([]);
+  const [diaCobrancaClientes, setDiaCobrancaClientes] = useState<10 | 30>(10);
+  const [salvandoClientes, setSalvandoClientes] = useState(false);
   const [confirmacao, setConfirmacao] = useState<{
     titulo: string;
     mensagem?: string;
@@ -165,6 +177,52 @@ export function MensalistasManager() {
     }
   }
 
+  // Busca clientes existentes para o modal de seleção
+  useEffect(() => {
+    if (!modalClientes || buscaCliente.trim().length < 2) {
+      setClientesResultado([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/clientes?busca=${encodeURIComponent(buscaCliente.trim())}`);
+        const dados = await res.json();
+        const telefonesExistentes = new Set(lista.map((m) => m.telefone));
+        setClientesResultado(
+          (Array.isArray(dados) ? dados : []).filter(
+            (c: ClienteSimples) => !telefonesExistentes.has(c.telefone)
+          )
+        );
+      } catch { /* ignore */ }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [buscaCliente, modalClientes, lista]);
+
+  async function adicionarClientes() {
+    if (clientesSelecionados.length === 0) return;
+    setSalvandoClientes(true);
+    const selecionados = clientesResultado.filter((c) => clientesSelecionados.includes(c.id));
+    let ok = 0;
+    for (const c of selecionados) {
+      const res = await fetch("/api/admin/mensalistas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefone: c.telefone, nome: c.nome, diaCobranca: diaCobrancaClientes }),
+      });
+      if (res.ok) ok++;
+    }
+    setSalvandoClientes(false);
+    if (ok > 0) {
+      toast.success(`${ok} cliente${ok > 1 ? "s" : ""} adicionado${ok > 1 ? "s" : ""} como mensalista${ok > 1 ? "s" : ""}.`);
+      setModalClientes(false);
+      setBuscaCliente("");
+      setClientesSelecionados([]);
+      carregar();
+    } else {
+      toast.error("Nenhum cliente pôde ser adicionado.");
+    }
+  }
+
   const ativos = lista.filter((m) => m.status === "ativo");
 
   return (
@@ -211,13 +269,22 @@ export function MensalistasManager() {
           <GrupoChip dia={10} qtd={ativos.filter((m) => m.diaCobranca === 10).length} />
           <GrupoChip dia={30} qtd={ativos.filter((m) => m.diaCobranca === 30).length} />
         </div>
-        <button
-          onClick={() => setModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95"
-        >
-          <Plus className="size-4" />
-          Novo mensalista
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setBuscaCliente(""); setClientesSelecionados([]); setModalClientes(true); }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-xs transition-all hover:bg-muted active:scale-95"
+          >
+            <UserPlus className="size-4" />
+            Selecionar cliente
+          </button>
+          <button
+            onClick={() => setModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95"
+          >
+            <Plus className="size-4" />
+            Novo
+          </button>
+        </div>
       </div>
 
       {carregando ? (
@@ -329,6 +396,109 @@ export function MensalistasManager() {
         onCancelar={() => setConfirmacao(null)}
         onConfirmar={() => confirmacao?.onConfirmar()}
       />
+
+      {/* Modal: selecionar cliente existente */}
+      <AdminModal
+        aberto={modalClientes}
+        onFechar={() => setModalClientes(false)}
+        titulo="Selecionar cliente"
+        largura="max-w-md"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              className={`${inputCls} pl-9`}
+              placeholder="Buscar por nome ou telefone…"
+              value={buscaCliente}
+              onChange={(e) => setBuscaCliente(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {buscaCliente.trim().length >= 2 && clientesResultado.length === 0 && (
+            <p className="py-3 text-center text-sm text-muted-foreground">
+              Nenhum cliente encontrado.
+            </p>
+          )}
+
+          {clientesResultado.length > 0 && (
+            <ul className="max-h-56 space-y-1.5 overflow-y-auto">
+              {clientesResultado.map((c) => {
+                const sel = clientesSelecionados.includes(c.id);
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setClientesSelecionados((prev) =>
+                          sel ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                        )
+                      }
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                        sel
+                          ? "border-primary bg-accent/60"
+                          : "border-border bg-card hover:bg-muted"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex size-5 shrink-0 items-center justify-center rounded border transition-colors",
+                          sel
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background"
+                        )}
+                      >
+                        {sel && <Check className="size-3" strokeWidth={3} />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {c.nome}
+                        </span>
+                        <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                          {formatarTelefone(c.telefone)}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <Campo rotulo="Grupo de fechamento">
+            <div className="flex gap-2">
+              {([10, 30] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDiaCobrancaClientes(d)}
+                  className={cn(
+                    "flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors",
+                    diaCobrancaClientes === d
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Dia {d}
+                </button>
+              ))}
+            </div>
+          </Campo>
+
+          <button
+            onClick={adicionarClientes}
+            disabled={clientesSelecionados.length === 0 || salvandoClientes}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+          >
+            {salvandoClientes && <Loader2 className="size-4 animate-spin" />}
+            {clientesSelecionados.length === 0
+              ? "Selecione um cliente"
+              : `Adicionar ${clientesSelecionados.length} cliente${clientesSelecionados.length > 1 ? "s" : ""}`}
+          </button>
+        </div>
+      </AdminModal>
 
       <AdminModal
         aberto={modal}

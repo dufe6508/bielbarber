@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import {
   QrCode,
@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { UpsellProdutos } from "./UpsellProdutos";
 
-const opcoes: {
+const TODAS_OPCOES: {
   valor: FormaPagamento;
   titulo: string;
   descricao: string;
@@ -54,8 +54,39 @@ type VerifResposta =
 export function StepPagamento() {
   const { formaPagamento, setFormaPagamento, mensalista, setMensalista, setNome, setTelefone, telefone } =
     useBooking();
-  // já temos o telefone do passo de identificação — pré-preenche a verificação
   const [telLocal, setTelLocal] = useState(telefone);
+
+  const telNums = telefoneNumeros(telefone);
+
+  // Verifica automaticamente se o cliente é mensalista com base no telefone da etapa de identificação
+  const { data: statusMensalista } = useQuery<VerifResposta | null>({
+    queryKey: ["check-mensalista", telNums],
+    queryFn: async () => {
+      if (telNums.length < 10) return null;
+      const res = await fetch(`/api/mensalistas/${telNums}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: telNums.length >= 10,
+    staleTime: 60_000,
+  });
+
+  const ehMensalista = statusMensalista?.mensalista === true;
+
+  // Auto-preenche os dados do mensalista quando detectado
+  useEffect(() => {
+    if (ehMensalista && statusMensalista?.nome && !mensalista) {
+      setMensalista({ nome: statusMensalista.nome, telefone: telNums });
+      setNome(statusMensalista.nome);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ehMensalista, statusMensalista?.nome]);
+
+  // Opção de mensalista só aparece se o cliente estiver cadastrado
+  const opcoes = useMemo(
+    () => ehMensalista ? TODAS_OPCOES : TODAS_OPCOES.filter((op) => op.valor !== "mensalista"),
+    [ehMensalista]
+  );
 
   const verificar = useMutation<VerifResposta, Error, string>({
     mutationFn: async (tel: string) => {
@@ -67,7 +98,6 @@ export function StepPagamento() {
     onSuccess: (dados, tel) => {
       if (dados.mensalista) {
         setMensalista({ nome: dados.nome, telefone: tel });
-        // prefill identificação
         setNome(dados.nome);
         setTelefone(formatarTelefone(tel));
       } else {
@@ -92,7 +122,6 @@ export function StepPagamento() {
     verificar.mutate(tel);
   }
 
-  // mensagem "não cadastrado" quando a verificação retornou mensalista:false
   const naoMensalista =
     verificar.isSuccess && verificar.data.mensalista === false
       ? verificar.data.nome
@@ -149,7 +178,7 @@ export function StepPagamento() {
                 )}
               </button>
 
-              {/* Verificação de mensalista (inline) */}
+              {/* Mensalista — mostra confirmação automática (já verificado) */}
               <AnimatePresence>
                 {op.valor === "mensalista" && ativo && (
                   <motion.div
@@ -161,7 +190,6 @@ export function StepPagamento() {
                   >
                     <div className="mt-3 rounded-xl border border-border bg-muted/30 p-4">
                       {mensalista ? (
-                        // Verificado com sucesso
                         <div className="flex items-center gap-3">
                           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                             <Check className="size-5" strokeWidth={2.5} aria-hidden="true" />
@@ -210,7 +238,6 @@ export function StepPagamento() {
                             </button>
                           </div>
 
-                          {/* Não é mensalista */}
                           {naoMensalista && (
                             <p className="flex items-start gap-2 text-sm text-destructive">
                               <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -221,7 +248,6 @@ export function StepPagamento() {
                               </span>
                             </p>
                           )}
-                          {/* Telefone não encontrado */}
                           {verificar.isError && (
                             <p className="flex items-start gap-2 text-sm text-destructive">
                               <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

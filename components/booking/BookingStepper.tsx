@@ -16,8 +16,8 @@ import { StepIdentificacao } from "./StepIdentificacao";
 import { TicketConfirmacao } from "./TicketConfirmacao";
 
 const PASSOS = [
-  { titulo: "Horário", descricao: "Dia e hora" },
   { titulo: "Serviços", descricao: "O que você quer fazer" },
+  { titulo: "Horário", descricao: "Dia e hora" },
   { titulo: "Seus dados", descricao: "Nome e telefone" },
   { titulo: "Pagamento", descricao: "Como prefere pagar" },
 ] as const;
@@ -74,14 +74,9 @@ export function BookingStepper({ limite }: { limite: string }) {
   function podeAvancar(): boolean {
     switch (passo) {
       case 0:
-        if (!booking.data || !booking.horario) return false;
-        // Coloração (se já escolhida): só avança com os 2 horários marcados
-        if (booking.slotsNecessarios() === 2 && !booking.horarioFim)
-          return false;
-        return true;
+        return booking.servicos.length > 0;
       case 1:
-        if (booking.servicos.length === 0) return false;
-        // Coloração escolhida depois do horário precisa do 2º slot reservado
+        if (!booking.data || !booking.horario) return false;
         if (booking.slotsNecessarios() === 2 && !booking.horarioFim)
           return false;
         return true;
@@ -240,8 +235,8 @@ export function BookingStepper({ limite }: { limite: string }) {
         exit={{ opacity: 0, x: -16 }}
         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
       >
-        {passo === 0 && <StepHorario limite={limite} />}
-        {passo === 1 && <StepServicos />}
+        {passo === 0 && <StepServicos />}
+        {passo === 1 && <StepHorario limite={limite} />}
         {passo === 2 && <StepIdentificacao />}
         {passo === 3 && <StepPagamento />}
       </motion.div>

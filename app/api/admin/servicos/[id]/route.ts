@@ -41,22 +41,18 @@ export async function PATCH(request: Request, { params }: Ctx) {
   return NextResponse.json(servico);
 }
 
-// DELETE — remove serviço. Se estiver em uso, apenas desativa.
+// DELETE — exclui permanentemente o serviço, removendo registros dependentes antes.
 export async function DELETE(_req: Request, { params }: Ctx) {
   if (!(await getAdminSession())) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   const { id } = await params;
-  const emUso = await prisma.appointmentService.findFirst({
-    where: { servicoId: id },
-    select: { servicoId: true },
-  });
-  if (emUso) {
-    await prisma.service.update({ where: { id }, data: { ativo: false } });
-    revalidateTag("servicos", {});
-    return NextResponse.json({ ok: true, desativado: true });
-  }
-  await prisma.service.delete({ where: { id } }).catch(() => null);
+  await prisma.$transaction([
+    prisma.appointmentService.deleteMany({ where: { servicoId: id } }),
+    prisma.packageService.deleteMany({ where: { servicoId: id } }),
+    prisma.galleryCategory.updateMany({ where: { servicoId: id }, data: { servicoId: null } }),
+    prisma.service.delete({ where: { id } }),
+  ]);
   revalidateTag("servicos", {});
   return NextResponse.json({ ok: true });
 }
