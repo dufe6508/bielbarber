@@ -10,11 +10,13 @@ export function RatingDrawer({
   open,
   onOpenChange,
   agendamentoId,
+  telefone,
   onAvaliado,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   agendamentoId: string;
+  telefone: string;
   onAvaliado: (rating: number) => void;
 }) {
   const [rating, setRating] = useState(0);
@@ -42,6 +44,7 @@ export function RatingDrawer({
           acao: "avaliar",
           rating,
           ratingComentario: comentario.trim() || undefined,
+          telefone,
         }),
       });
       const dados = await res.json();

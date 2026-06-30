@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
 import { dataISOLocal } from "@/lib/utils/format";
@@ -21,11 +22,13 @@ async function avisarListaEspera(data: Date): Promise<void> {
   );
 }
 
-type Body =
-  | { acao: "cancelar" }
-  | { acao: "remarcar"; data: string; horario: string }
-  | { acao: "avaliar"; rating: number; ratingComentario?: string }
-  | { acao: "checkin" };
+const BodySchema = z.discriminatedUnion("acao", [
+  z.object({ acao: z.literal("cancelar"), telefone: z.string() }),
+  z.object({ acao: z.literal("remarcar"), data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), horario: z.string().regex(/^\d{2}:\d{2}$/), telefone: z.string() }),
+  z.object({ acao: z.literal("avaliar"), rating: z.number().int().min(1).max(5), ratingComentario: z.string().max(500).optional(), telefone: z.string() }),
+  z.object({ acao: z.literal("checkin"), telefone: z.string() }),
+]);
+type Body = z.infer<typeof BodySchema>;
 
 // É o mesmo dia (local) do agendamento?
 function ehHoje(data: Date): boolean {
@@ -52,14 +55,26 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = (await request.json()) as Body;
+  const parsed = BodySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
+  }
+  const body = parsed.data;
 
-  const agendamento = await prisma.appointment.findUnique({ where: { id } });
+  const agendamento = await prisma.appointment.findUnique({
+    where: { id },
+    include: { cliente: { select: { telefone: true } } },
+  });
   if (!agendamento) {
     return NextResponse.json(
       { error: "Agendamento não encontrado." },
       { status: 404 }
     );
+  }
+
+  const telefone = body.telefone?.replace(/\D/g, "");
+  if (!telefone || agendamento.cliente.telefone.replace(/\D/g, "") !== telefone) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
   }
 
   // ─── Avaliar (rating pós-corte) ───

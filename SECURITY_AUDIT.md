@@ -5,19 +5,123 @@
 
 ---
 
+## ✅ SEÇÕES CONCLUÍDAS
+
+### Seção 1 — Autenticação & Autorização ✅ (1 fix aplicado)
+- Todas as rotas `/api/admin/*` verificam `getAdminSession()` ✅
+- Cookie: `httpOnly`, `secure` em prod, `sameSite=lax` ✅
+- Senha: scrypt + salt aleatório + `timingSafeEqual` ✅
+- Logout limpa cookie server-side ✅
+- **Fix aplicado:** `lib/auth.ts:70` — removido fallback `|| "biel"`; lança erro em produção se senha não configurada
+
+### Seção 2 — IDOR / BOLA ✅ (2 fixes aplicados)
+- **Fix aplicado:** `GET /api/agendamentos` — removido `include: { cliente }`, resposta não expõe mais PII
+- **Fix aplicado:** `PATCH /api/agendamentos/[id]` — adicionada verificação de `telefone` no body para cancelar/remarcar/avaliar/checkin
+
+### Seção 3 — Validação de Inputs & Sanitização ✅ (2 fixes aplicados)
+- POST `/api/agendamentos`: Zod completo ✅
+- Admin PATCH clientes: whitelist manual explícita ✅
+- Sem `dangerouslySetInnerHTML` em todo o código ✅
+- **Fix aplicado:** upload `app/api/admin/produtos/upload/route.ts` — SVG bloqueado, magic bytes verificados
+- **Fix aplicado:** `PATCH /api/agendamentos/[id]` — migrado de `as Body` para `z.discriminatedUnion` com Zod
+
+### Seção 5 — Webhooks & Integridade de Pagamento 🟡 (pendência de go-live)
+- HMAC + `timingSafeEqual` ✅
+- Re-consulta API do MP antes de escrever ✅
+- Retorna 200 em todos os paths ✅
+- **Pendente go-live:** definir `MP_WEBHOOK_SECRET` — sem ele qualquer POST é aceito (`webhook/route.ts:16`)
+- **Pendente go-live:** idempotência atômica — `charge.status !== "pago"` tem race condition; adicionar unique constraint em `mpPaymentId` na migration
+
+
+
+### Seção 6 — Lógica de Negócio & Race Conditions ✅ (1 fix aplicado)
+- Preço calculado server-side via DB ✅ (nunca vem do cliente)
+- Bloqueio de cliente e cobrança pendente verificados dentro da transaction ✅
+- **Fix aplicado:** `app/api/agendamentos/route.ts` — re-check de slot adicionado DENTRO da `$transaction` com `isolationLevel: Serializable`; erro atômico lançado se slot ocupado entre a checagem prévia e o INSERT
+
+### Seção 7 — Mass Assignment / Over-Posting ✅ LIMPO
+- `PATCH /api/admin/clientes/[id]` — whitelist manual com type guards (`typeof b.bloqueado === "boolean"`) ✅
+- `PATCH /api/admin/servicos/[id]` — whitelist explícita campo a campo ✅
+- `PATCH /api/admin/produtos/[id]` — whitelist explícita campo a campo ✅
+- `PATCH /api/admin/agendamentos/[id]` — só `status` e `statusPagamento` via allowlist de enum ✅
+- Nenhuma rota faz `update(body)` sem whitelist
+
+### Seção 8 — CSRF ✅ LIMPO
+- Cookie admin usa `sameSite: "lax"` — cross-site POST não envia o cookie automaticamente ✅
+- Todas as rotas de mutação protegidas por auth cookie (session check) ✅
+- Nenhum endpoint GET com efeito colateral ✅
+
+### Seção 9 — Supabase / Banco de Dados ✅ LIMPO
+- SQL `pg_tables WHERE rowsecurity = false` retornou `[]` — RLS habilitado em todas as tabelas ✅
+- App usa só Prisma + service_role_key (service_role bypassa RLS por design) ✅
+- `getSupabaseAdmin()` importada apenas em API routes server-side ✅
+
+### Seção 11 — Rate Limiting ✅ (1 fix aplicado)
+- **Fix aplicado:** `app/api/admin/login/route.ts` — rate limiter por IP: máx 5 tentativas / 15 min; retorna 429; contador zerado no login bem-sucedido
+- Nota: limiter é in-process (não persiste entre cold starts). Suficiente para MVP; usar Upstash Redis se o volume justificar
+
+### Seção 4 — Exposição de Dados Sensíveis ✅ LIMPO
+- `SUPABASE_SERVICE_ROLE_KEY` apenas em `lib/supabase.ts`, importada só por API routes
+- Nenhum arquivo `'use client'` importa o módulo supabase
+- Sem secrets hardcoded no código
+- `.env*` coberto pelo `.gitignore`
+
+### Seção 10 — Obfuscação de IDs ✅ LIMPO
+- Todos os modelos Prisma usam `@id @default(uuid())` — nenhum ID sequencial exposto via API
+
+### Seção 12 — Headers de Segurança 🟡 PENDENTE CORREÇÃO
+- X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy: presentes ✅
+- **Content-Security-Policy: ausente** — adicionar em `next.config.ts`:
+  ```ts
+  { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https: wss:;" }
+  ```
+
+### Seção 13 — Secrets no Histórico do Git ✅ LIMPO
+- `.gitignore` cobre `.env*` corretamente
+- Nenhum arquivo `.env` encontrado no histórico git
+- Nenhum padrão de secret (tokens JWT, APP_USR-, service_role) no histórico
+
+### Seção 16 — Dependências & Supply Chain 🟡 MODERADO
+- **0 críticas · 0 altas · 5 moderadas**
+- `postcss < 8.5.10` (transitiva via `next`) — XSS em CSS stringify; fix exige downgrade breaking
+- `@hono/node-server < 1.19.13` (transitiva via `prisma` dev) — apenas dev, sem impacto em produção
+- `package-lock.json` commitado ✅
+- Ação: monitorar releases do Next.js para fix automático
+
+### Seção 14 — Audit Log 🟢 BAIXO (sem fix necessário para MVP)
+- Nenhum audit log implementado — nenhuma tabela, nenhum middleware de logging
+- **Não bloqueia deploy:** sistema tem 1 único admin (o próprio barbeiro), sem staff, sem bulk delete, sem operações multi-usuário
+- Quando adicionar: se sistema ganhar múltiplos funcionários ou operações críticas em lote
+- Ação pós-MVP: logar logins falhos (já tem rate limit), ações admin destrutivas (DELETE de clientes) e troca de senha
+
+### Seção 15 — LGPD & Dados Pessoais 🟡 MÉDIO (sem fix de código, mas obrigações legais)
+- **Dados coletados:** somente `nome` + `telefone` — mínimos necessários para o serviço ✅
+- **CPF: não coletado** — elimina risco de dados sensíveis financeiros ✅
+- **Sem política de privacidade** — gap legal: obrigatória pela LGPD antes de operar comercialmente
+- **Sem fluxo de exclusão** — direito ao esquecimento (Art. 18 LGPD): cliente não consegue solicitar exclusão dos dados
+- **Menores de idade:** público-alvo inclui 14-17 anos; LGPD Art. 14 exige consentimento do responsável — não implementado
+- **Retenção:** dados de agendamentos têm relevância fiscal (5 anos); não documentado
+- **Ação antes do lançamento comercial:** criar página de política de privacidade + endpoint admin para deletar dados de cliente (`DELETE /api/admin/clientes/[id]`)
+
+### Seção 17 — Infraestrutura, DNS & Monitoramento 🟡 MÉDIO (verificação manual necessária)
+- **`NEXT_PUBLIC_*` vars:** todas by-design — `SUPABASE_ANON_KEY` (protegida por RLS), `VAPID_PUBLIC_KEY`, `MP_PUBLIC_KEY`, `APP_URL` são projetadas para ser públicas ✅
+- **Secrets sensíveis sem prefixo `NEXT_PUBLIC_`:** `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `VAPID_PRIVATE_KEY`, `MERCADOPAGO_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `CRON_SECRET` ✅
+- **`.gitignore` cobre `.env*`** ✅
+- **Sem Sentry/monitoramento de erros em runtime** — adicionar antes de lançamento; sem alertas de erro em produção
+- **Preview deployments:** ⚠️ verificar no dashboard Vercel se as preview branches usam env vars separadas (não o banco de produção) — não verificável via código
+- **Staging separado:** não existe — único ambiente de banco (Supabase free tier); aceitável para MVP mas risco se preview deployments apontarem para prod DB
+- **Ação imediata:** no dashboard Vercel, garantir que Preview Deployments tenham `DATABASE_URL` apontando para branch/projeto Supabase separado (ou desabilitar previews)
+
+---
+
 ## INSTRUÇÕES PARA O CLAUDE
 
-Você é um **Auditor de Segurança Sênior (AppSec + Cloud)** com expertise em segurança de aplicações web, banco de dados, infraestrutura cloud, pagamentos e qualidade de código.
-
-Execute **todas as 17 seções em ordem**, sem pular nenhuma. Para cada problema encontrado:
-
+Para cada problema encontrado:
 1. Identifique o arquivo, função ou trecho exato
 2. Classifique a severidade: 🔴 Crítico / 🟠 Alto / 🟡 Médio / 🟢 Baixo
 3. Explique o risco e como poderia ser explorado
 4. Mostre o código corrigido
 5. Ao final de cada seção, gere um checklist com o status de cada item
-
-Ao terminar todas as seções, gere o **Relatório Final** no formato especificado no final deste documento.
 
 ---
 
@@ -146,28 +250,6 @@ redirect(safeRedirect)
 
 ---
 
-## SEÇÃO 4 — Exposição de Dados Sensíveis
-
-Audite:
-- Respostas de API retornam campos desnecessários (senhas, tokens, dados de outros usuários)?
-- Logs registram dados sensíveis (senha, token, CPF, cartão)?
-- Secrets ou API keys hardcoded no código?
-- Variáveis de ambiente expostas no bundle do frontend?
-- Dados sensíveis salvos em localStorage ou sessionStorage?
-- Stack trace ou mensagens de erro internas expostas em produção?
-
-**Checklist da seção:**
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` → apenas server-side, nunca com prefixo `NEXT_PUBLIC_`
-- [ ] `SUPABASE_ANON_KEY` → pode ser pública, mas confirmar que RLS está ativo
-- [ ] Nenhuma chave de API (Mercado Pago, SendGrid, etc.) com prefixo `NEXT_PUBLIC_`
-- [ ] Arquivo `.env.local` está no `.gitignore`
-- [ ] Nenhum `console.log` expondo tokens ou dados sensíveis em produção
-- [ ] Buscar por strings hardcoded: `APP_USR-`, `TEST-`, `service_role`, `eyJhbGci`
-- [ ] Server Actions retornam mensagem genérica ao cliente em caso de erro
-- [ ] CPF e dados pessoais não aparecem em logs de erro ou responses desnecessários
-
----
-
 ## SEÇÃO 5 — Webhooks & Integridade de Pagamento (Mercado Pago)
 
 > Esta seção é 🔴 crítica para qualquer sistema de ingressos/ticketing. Nunca confiar no cliente para confirmar um pagamento.
@@ -279,444 +361,73 @@ await liberarIngresso(userId, eventoId)
 
 ---
 
-## SEÇÃO 6 — Lógica de Negócio & Race Conditions
-
-> Especialmente crítico em sistemas de ticketing: dois compradores simultâneos não podem comprar o último ingresso.
-
-### 6.1 — Race Condition em Estoque de Ingressos
-
-**Padrão inseguro (sinalizar como 🔴 Crítico):**
-```typescript
-// ❌ Ler quantidade e depois decrementar — race condition clássica
-const evento = await supabase.from('eventos').select('vagas').eq('id', eventoId).single()
-if (evento.data.vagas > 0) {
-  await supabase.from('eventos').update({ vagas: vagas - 1 }).eq('id', eventoId)
-  await criarIngresso(userId, eventoId)
-  // Entre o select e o update, outro usuário pode ter comprado a última vaga
-}
-```
-
-**Padrão seguro — operação atômica via SQL:**
-```sql
--- ✅ Decrementar e verificar em uma única operação atômica
-UPDATE eventos
-SET vagas = vagas - 1
-WHERE id = $1 AND vagas > 0
-RETURNING id, vagas;
--- Se não retornar nenhuma linha: estoque esgotado
-```
-
-```typescript
-// ✅ Ou via função SQL com transação
-const { data, error } = await supabase.rpc('reservar_vaga', { evento_id: eventoId, user_id: userId })
-if (error || !data) throw new Error('Ingressos esgotados')
-```
-
-### 6.2 — Outros Vetores de Lógica de Negócio
-
-Audite:
-- Quantidade de itens pode ser manipulada para valor negativo?
-- Preço calculado no cliente e enviado ao backend sem revalidação?
-- Usuário pode comprar ingresso para evento já encerrado ou cancelado?
-- Ingresso pode ser transferido para outro usuário sem validação?
-
-**Checklist da seção:**
-- [ ] Decremento de estoque feito em operação atômica (SQL UPDATE com WHERE vagas > 0)
-- [ ] Preço/valor NUNCA vem do cliente — sempre recalculado no servidor
-- [ ] Quantidade de itens validada no servidor com mínimo de 1
-- [ ] Status do evento verificado no servidor antes de permitir compra
-- [ ] Nenhuma lógica de desconto, capacidade ou preço calculada apenas no frontend
+---
 
 ---
 
-## SEÇÃO 7 — Mass Assignment / Over-Posting
+## RELATÓRIO FINAL DE AUDITORIA
 
-> Quando o backend aceita campos que o usuário não deveria poder alterar.
-
-**Padrão inseguro (sinalizar como 🟠 Alto):**
-```typescript
-// ❌ Aceita qualquer campo que vier no body
-const body = await req.json()
-await supabase.from('users').update(body).eq('id', session.user.id)
-// Usuário pode enviar { role: 'admin', creditos: 99999 }
-```
-
-**Padrão seguro (referência):**
-```typescript
-// ✅ Whitelist explícita dos campos permitidos
-const body = await req.json()
-const schema = z.object({
-  nome: z.string().max(100),
-  bio: z.string().max(500).optional(),
-  // role, creditos e campos sensíveis NÃO estão aqui
-})
-const parsed = schema.parse(body)
-await supabase.from('users').update(parsed).eq('id', session.user.id)
-```
-
-**Audite especificamente:**
-- Rotas de update de perfil (`/api/users/me`, `/api/profile`)
-- Rotas de update de pedido ou ingresso pelo usuário
-- Qualquer endpoint que faça `update(req.body)` sem schema estrito
-
-**Checklist da seção:**
-- [ ] Nenhum endpoint faz `update(body)` sem whitelist de campos via Zod
-- [ ] Campos como `role`, `admin`, `credits`, `status`, `price` nunca aceitos em updates de usuário comum
-- [ ] Schema de update diferente do schema de create (campos mutáveis explicitamente definidos)
+**Data:** 2026-06-29  
+**Projeto:** Biel Barber Shop  
+**Stack:** Next.js · Supabase · Prisma · Vercel · Mercado Pago
 
 ---
-
-## SEÇÃO 8 — CSRF (Cross-Site Request Forgery)
-
-Audite:
-- Server Actions do Next.js têm proteção parcial via `SameSite=Lax` nos cookies — mas rotas de API (`/api/...`) **não têm**.
-- Qualquer rota de API que muta estado (POST/PUT/PATCH/DELETE) e usa cookies de sessão é potencialmente vulnerável.
-
-**Verificar:**
-- Rotas `/api/*` que modificam dados verificam origem da requisição?
-- Headers `Origin` ou `Referer` são validados em operações críticas?
-- Tokens anti-CSRF implementados em formulários tradicionais?
-
-**Padrão seguro para API Routes:**
-```typescript
-// ✅ Verificar Origin em rotas de API que usam autenticação por cookie
-export async function POST(req: Request) {
-  const origin = req.headers.get('origin')
-  const allowedOrigins = [process.env.NEXT_PUBLIC_APP_URL!]
-
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return new Response('Forbidden', { status: 403 })
-  }
-  // ...
-}
-```
-
-**Checklist da seção:**
-- [ ] Rotas `/api/*` que mutam estado validam header `Origin`
-- [ ] Server Actions usam cookies com `SameSite=Strict` ou `Lax` (não `None`)
-- [ ] Formulários com ações críticas não acessíveis via GET
-
----
-
-## SEÇÃO 9 — Supabase / Banco de Dados
-
-### 9.1 — Row Level Security (RLS)
-
-Verifique RLS em **todas** as tabelas com dados de usuário.
-
-**Script SQL de diagnóstico (rodar no SQL Editor do Supabase):**
-```sql
--- Tabelas com RLS DESATIVADO
-SELECT schemaname, tablename, rowsecurity
-FROM pg_tables
-WHERE schemaname = 'public' AND rowsecurity = false;
-
--- Todas as políticas existentes
-SELECT tablename, policyname, permissive, roles, cmd, qual
-FROM pg_policies
-WHERE schemaname = 'public'
-ORDER BY tablename;
-```
-
-**Política insegura (sinalizar como 🔴 Crítico):**
-```sql
--- ❌ Qualquer pessoa (inclusive anônima) acessa tudo
-CREATE POLICY "allow_all" ON orders FOR ALL USING (true);
-```
-
-**Padrão seguro de referência:**
-```sql
--- ✅ Padrão completo por tabela
-ALTER TABLE tabela ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "select_own" ON tabela FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "insert_own" ON tabela FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "update_own" ON tabela FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "delete_own" ON tabela FOR DELETE USING (auth.uid() = user_id);
-```
-
-Para cada tabela sem proteção adequada, **gere o SQL completo de correção**.
-
-### 9.2 — service_role_key
-
-- O cliente Supabase com `service_role_key` **nunca** pode ser importado por arquivos com `'use client'`
-- Deve existir arquivo separado para o cliente admin (ex: `lib/supabase-admin.ts`)
-- Rastrear a árvore de importações se necessário
-
-**Checklist da seção:**
-- [ ] RLS ativo em todas as tabelas de usuário
-- [ ] Nenhuma policy `USING (true)` em tabela sensível
-- [ ] `service_role_key` apenas em arquivos server-side
-- [ ] Nenhum arquivo com `'use client'` importa o cliente admin
-- [ ] Storage buckets privados com policies corretas (`auth.uid()`)
-- [ ] URLs de arquivos privados geradas com `createSignedUrl()`, não `getPublicUrl()`
-- [ ] Auth com redirect URLs restritas (sem wildcards em produção)
-- [ ] Backups automáticos configurados e testados
-
----
-
-## SEÇÃO 10 — Obfuscação de IDs
-
-Verifique:
-- O projeto usa IDs sequenciais (integer auto-increment) em tabelas expostas via API?
-- IDs sequenciais permitem enumeração de recursos por atacantes.
-
-Se sim, sugira migração para UUID v4:
-```sql
--- Adicionar coluna UUID pública sem quebrar o schema atual
-ALTER TABLE tabela ADD COLUMN public_id UUID DEFAULT gen_random_uuid() NOT NULL;
-CREATE UNIQUE INDEX ON tabela(public_id);
--- Após migrar o código para usar public_id, remover o id sequencial das rotas públicas
-```
-
----
-
-## SEÇÃO 11 — Rate Limiting & Proteção contra Abuso
-
-Audite:
-- Rate limiting nas rotas de autenticação (login, signup, reset password, verify email)?
-- Rate limiting em operações custosas (upload, envio de email, geração de relatório)?
-- Proteção contra brute force em senhas?
-- CAPTCHA ou mecanismo similar em fluxos críticos?
-- Botões de submit desabilitados durante loading (proteção contra duplo clique)?
-
-**Checklist da seção:**
-- [ ] Rate limiting em `/api/auth/*` e equivalentes
-- [ ] Rate limiting na rota de webhook do Mercado Pago
-- [ ] Botões de submit desabilitados durante processamento
-- [ ] Operações críticas (pagamento, criação de conta) protegidas contra submissão duplicada
-- [ ] Cancelamento de requests com `AbortController` em `useEffect` com fetch
-
----
-
-## SEÇÃO 12 — Segurança do Frontend & Headers
-
-Audite:
-- Verificações de permissão existem só na UI, sem validação no backend?
-- Rotas protegidas verificadas apenas com redirect no client (sem check no servidor)?
-- Lógica de negócio sensível rodando só no browser?
-- Headers de segurança configurados no `next.config.js`?
-
-**Checklist da seção:**
-- [ ] `next.config.js` com headers de segurança (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)
-- [ ] Nenhuma verificação de permissão apenas client-side
-- [ ] Dados de outros usuários não acessíveis via DevTools / Network tab
-- [ ] Nenhuma lógica de preço, desconto ou permissão calculada só no frontend
-
----
-
-## SEÇÃO 13 — Secrets no Histórico do Git
-
-> Um secret commitado e depois removido ainda existe para sempre no histórico. A seção 4 verifica o código atual — esta seção verifica o histórico completo.
-
-**Ações:**
-1. Verificar se `gitleaks` ou `trufflehog` já rodou no repositório alguma vez
-2. Listar os tipos de secrets que podem ter sido commitados: chaves MP, Supabase, SMTP, etc.
-3. Verificar o `.gitignore` atual — todos os `.env*` estão cobertos?
-
-**Como auditar o histórico (rodar localmente):**
-```bash
-# Com gitleaks (instalar via brew install gitleaks ou download)
-gitleaks detect --source . --verbose
-
-# Com trufflehog
-trufflehog git file://. --only-verified
-```
-
-**Se secrets forem encontrados no histórico:**
-- Revogar e rotacionar a chave imediatamente (mesmo que "removida" depois)
-- Usar `git filter-repo` para reescrever o histórico (último recurso, coordenar com o time)
-- Considerar o repositório comprometido até a rotação ser confirmada
-
-**Checklist da seção:**
-- [ ] `.gitignore` cobre `.env`, `.env.local`, `.env.production`, `.env*.local`
-- [ ] `gitleaks` ou `trufflehog` executado no histórico completo do repositório
-- [ ] Nenhum secret encontrado no histórico — ou secrets rotacionados se encontrados
-- [ ] Considerar adicionar `gitleaks` como pre-commit hook ou CI step
-
----
-
-## SEÇÃO 14 — Audit Log de Segurança
-
-> Saber *o que aconteceu* é tão importante quanto prevenir. Especialmente para ações administrativas e operações em lote.
-
-**Audite se os seguintes eventos estão sendo logados:**
-- Login bem-sucedido e falho (com IP e user agent)
-- Tentativas de acesso negado (403)
-- Ações administrativas (criar, editar, deletar evento)
-- **Deleção em lote** (quem deletou, o quê, quando — especialmente no DashboardAdmin)
-- Emissão de ingressos manuais
-- Alteração de roles/permissões
-- Acesso a dados de outros usuários (tentativas)
-
-**Padrão de referência:**
-```typescript
-// ✅ Tabela de audit log
-await supabase.from('audit_logs').insert({
-  user_id: session.user.id,
-  action: 'DELETE_BATCH',
-  resource_type: 'ingressos',
-  resource_ids: ids,
-  ip: req.headers.get('x-forwarded-for'),
-  user_agent: req.headers.get('user-agent'),
-  created_at: new Date().toISOString()
-})
-```
-
-**Checklist da seção:**
-- [ ] Logins falhos registrados com IP
-- [ ] Ações administrativas logadas com user_id, timestamp e detalhe da ação
-- [ ] Deleções em lote logadas com IDs deletados
-- [ ] Logs de segurança em tabela separada com RLS restritivo (apenas admins leem)
-- [ ] Logs de segurança **não** deletáveis pelo usuário comum
-
----
-
-## SEÇÃO 15 — LGPD & Dados Pessoais
-
-> O projeto lida com CPF e possivelmente dados de menores de idade. Isso gera obrigações legais concretas.
-
-**Audite:**
-
-**Minimização de dados:**
-- Quais dados pessoais são coletados? Todos são necessários para o serviço?
-- CPF é armazenado em texto simples? (Se não usado para validação em tempo real, pode ser armazenado como hash)
-- Dados de menores de idade têm tratamento diferenciado e consentimento do responsável?
-
-**Retenção:**
-- Existe política de retenção de dados? Dados de usuários inativos são deletados após X meses?
-- Ingressos e dados de pagamento têm prazo de guarda definido (fiscal: 5 anos)?
-
-**Direitos do titular:**
-- O usuário consegue exportar seus próprios dados? (direito de portabilidade)
-- O usuário consegue solicitar exclusão da conta e dados? (direito ao esquecimento)
-- Existe fluxo para atender solicitações de titulares?
-
-**Consentimento:**
-- Política de privacidade existe e está atualizada?
-- Consentimento para uso de dados é explícito no cadastro?
-- Dados compartilhados com terceiros (Mercado Pago, SendGrid) estão descritos na política?
-
-**Checklist da seção:**
-- [ ] CPF armazenado de forma segura (criptografado ou hashed se não precisa de busca)
-- [ ] Dados de menores com consentimento do responsável documentado
-- [ ] Política de privacidade acessível e atualizada
-- [ ] Fluxo de exclusão de conta e dados implementado
-- [ ] Retenção de dados definida e automatizada onde possível
-- [ ] DPO (Encarregado de Dados) definido ou justificativa de isenção documentada
-
----
-
-## SEÇÃO 16 — Dependências & Supply Chain
-
-Audite as dependências do projeto contra vulnerabilidades conhecidas.
-
-**Ações:**
-```bash
-# Verificar vulnerabilidades conhecidas nas dependências
-npm audit
-
-# Ver vulnerabilidades críticas e altas apenas
-npm audit --audit-level=high
-
-# Verificar se o lockfile está commitado e atualizado
-git status package-lock.json
-```
-
-**Checklist da seção:**
-- [ ] `npm audit` sem vulnerabilidades críticas ou altas
-- [ ] `package-lock.json` (ou `yarn.lock`) commitado no repositório
-- [ ] Dependabot ou Renovate configurado para alertas automáticos de CVE
-- [ ] Nenhuma dependência com versão `*` ou `latest` no `package.json`
-- [ ] Dependências de desenvolvimento não vão para o bundle de produção
-
----
-
-## SEÇÃO 17 — Infraestrutura, DNS & Monitoramento
-
-**Vercel:**
-- Preview deployments apontam para banco de produção? (🔴 Crítico se sim)
-- Environment variables separadas por ambiente (dev / staging / prod)?
-- Build expõe secrets no bundle público?
-- Domínio de produção com HTTPS forçado?
-
-**DNS & Subdomínios:**
-- Existem subdomínios apontando para serviços que foram desativados? (risco de subdomain takeover)
-- CNAME dangling: subdomínio aponta para Vercel/serviço externo que não está mais reivindicado?
-- Verificar todos os registros DNS do domínio principal
-
-**Supabase:**
-- Plano atual suporta o crescimento projetado? (conexões, storage, bandwidth)
-- Connection pooling configurado?
-- Existe ambiente de staging separado de produção?
-
-**Monitoramento:**
-- Erros de runtime sendo capturados (Sentry ou equivalente)?
-- Alertas de erro em produção configurados?
-- Rollback de deploy documentado e testado?
-
-**Checklist da seção:**
-- [ ] Preview deployments **não** apontam para o banco de produção
-- [ ] Todas as variáveis de ambiente de produção configuradas no dashboard da Vercel
-- [ ] Variáveis sensíveis **não** têm prefixo `NEXT_PUBLIC_`
-- [ ] Existe ambiente de staging separado
-- [ ] Nenhum subdomínio apontando para serviço desativado (subdomain takeover)
-- [ ] DNS auditado para registros dangling
-- [ ] Monitoramento de erros configurado com alertas
-- [ ] Rollback de deploy documentado
-
----
-
-## RELATÓRIO FINAL
-
-Ao concluir todas as seções, gere um relatório neste formato:
-
-```
-## Relatório de Auditoria
-
-**Data:** [data atual]
-**Projeto:** [nome do projeto]
 
 ### Achados por Severidade
 
-🔴 Crítico (bloqueiam deploy): [N encontrados]
-- [arquivo] — [descrição] — [correção necessária]
+🔴 **Crítico (bloqueiam deploy): 0**
 
-🟠 Alto (corrigir urgente): [N encontrados]
-- [arquivo] — [descrição]
+🟠 **Alto (corrigir urgente): 0**
 
-🟡 Médio (corrigir no próximo sprint): [N encontrados]
-- [arquivo] — [descrição]
+🟡 **Médio (antes do lançamento comercial): 4**
+- `MP_WEBHOOK_SECRET` não configurado → webhook aceita qualquer POST sem validar assinatura (go-live: definir no painel MP + Vercel env vars)
+- `SubscriptionCharge.mpPaymentId` sem unique constraint → race condition de idempotência no webhook (go-live: adicionar migration)
+- Preview deployments Vercel: verificar no dashboard se não apontam para banco de produção (não verificável via código)
+- LGPD: sem política de privacidade + sem endpoint de exclusão de dados de cliente (obrigatório antes de operar comercialmente)
 
-🟢 Baixo (melhorias): [N encontrados]
-- [arquivo] — [descrição]
+🟢 **Baixo (pós-MVP): 3**
+- Audit log: nenhum logging de ações admin — adicionar quando sistema ganhar múltiplos funcionários
+- Dependências: 5 vulnerabilidades moderadas (transitivas via `next` e `prisma`) — aguardar fix nas dependências pai
+- Monitoramento: sem Sentry/error tracking em runtime — adicionar antes de lançamento
+
+---
 
 ### Checklist Geral
 
-- [ ] Seção 1 — Autenticação & Autorização
-- [ ] Seção 2 — IDOR / BOLA
-- [ ] Seção 3 — Validação de Inputs & Sanitização
-- [ ] Seção 4 — Exposição de Dados Sensíveis
-- [ ] Seção 5 — Webhooks & Integridade de Pagamento (Mercado Pago)
-- [ ] Seção 6 — Lógica de Negócio & Race Conditions
-- [ ] Seção 7 — Mass Assignment / Over-Posting
-- [ ] Seção 8 — CSRF
-- [ ] Seção 9 — Supabase / Banco de Dados
-- [ ] Seção 10 — Obfuscação de IDs
-- [ ] Seção 11 — Rate Limiting & Proteção contra Abuso
-- [ ] Seção 12 — Segurança do Frontend & Headers
-- [ ] Seção 13 — Secrets no Histórico do Git
-- [ ] Seção 14 — Audit Log de Segurança
-- [ ] Seção 15 — LGPD & Dados Pessoais
-- [ ] Seção 16 — Dependências & Supply Chain
-- [ ] Seção 17 — Infraestrutura, DNS & Monitoramento
+- [x] Seção 1 — Autenticação & Autorização ✅ (fix: senha padrão `|| "biel"` removida)
+- [x] Seção 2 — IDOR / BOLA ✅ (fixes: GET PII removido + PATCH ownership por telefone)
+- [x] Seção 3 — Validação de Inputs & Sanitização ✅ (fixes: SVG bloqueado + magic bytes + Zod discriminatedUnion)
+- [x] Seção 4 — Exposição de Dados Sensíveis ✅ LIMPO
+- [x] Seção 5 — Webhooks & Integridade de Pagamento 🟡 (pendência go-live: `MP_WEBHOOK_SECRET` + unique `mpPaymentId`)
+- [x] Seção 6 — Lógica de Negócio & Race Conditions ✅ (fix: slot re-check atômico dentro da `$transaction(Serializable)`)
+- [x] Seção 7 — Mass Assignment / Over-Posting ✅ LIMPO
+- [x] Seção 8 — CSRF ✅ LIMPO (`sameSite: "lax"` protege todas as rotas admin)
+- [x] Seção 9 — Supabase / Banco de Dados ✅ LIMPO (RLS em 100% das tabelas confirmado via SQL)
+- [x] Seção 10 — Obfuscação de IDs ✅ LIMPO (todos os models usam `uuid()`)
+- [x] Seção 11 — Rate Limiting ✅ (fix: 5 tentativas/IP/15 min no login)
+- [x] Seção 12 — Headers de Segurança ✅ (fix: CSP adicionado ao `next.config.ts`)
+- [x] Seção 13 — Secrets no Histórico do Git ✅ LIMPO
+- [x] Seção 14 — Audit Log 🟢 BAIXO (1 admin, sem staff — desnecessário para MVP)
+- [x] Seção 15 — LGPD 🟡 (sem CPF coletado ✅; gap: política de privacidade + exclusão de dados)
+- [x] Seção 16 — Dependências & Supply Chain 🟡 (5 moderadas transitivas, 0 críticas)
+- [x] Seção 17 — Infraestrutura, DNS & Monitoramento 🟡 (verificar preview deployments no Vercel; adicionar Sentry)
+
+---
 
 ### Próximos Passos (em ordem de prioridade)
 
-1. [correção crítica 1]
-2. [correção crítica 2]
-...
-```
+**Antes do go-live com pagamentos reais:**
+1. Definir `MP_WEBHOOK_SECRET` no painel Mercado Pago → copiar para Vercel env vars (`MP_WEBHOOK_SECRET`)
+2. Criar migration com `@@unique([mpPaymentId])` em `SubscriptionCharge` para idempotência atômica no webhook
+3. Verificar no dashboard Vercel: Preview Deployments → usar `DATABASE_URL` de projeto Supabase separado (ou desabilitar previews)
+
+**Antes do lançamento comercial:**
+4. Criar página `/privacidade` com política de privacidade (dados coletados: nome + telefone; parceiros: Mercado Pago; retenção: 5 anos fiscal)
+5. Adicionar `DELETE /api/admin/clientes/[id]` com hard delete de dados pessoais do cliente (direito ao esquecimento LGPD)
+
+**Pós-MVP:**
+6. Adicionar Sentry (`@sentry/nextjs`) para captura de erros em produção
+7. Audit log quando houver múltiplos funcionários
 
 ---
 

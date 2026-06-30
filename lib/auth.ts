@@ -67,7 +67,13 @@ export async function verificarSenha(senha: unknown): Promise<boolean> {
     return comparaConstante(hashSenha(senha, salt), hash);
   }
   // Fallback: senha de ambiente, válida até a primeira troca pela UI.
-  const esperada = process.env.ADMIN_PASSWORD || "biel";
+  const esperada = process.env.ADMIN_PASSWORD;
+  if (!esperada) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("ADMIN_PASSWORD não definida e nenhuma senha cadastrada no banco.");
+    }
+    return false; // dev sem senha configurada → bloqueia em vez de deixar passar
+  }
   return comparaConstante(senha, esperada);
 }
 

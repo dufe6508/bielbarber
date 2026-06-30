@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
 import { notify } from "@/lib/notifications/notify";
@@ -16,7 +17,14 @@ export async function GET(request: Request) {
 
   const agendamentos = await prisma.appointment.findMany({
     where: { data: { gte: desde } },
-    include: { cliente: true, servicos: { include: { servico: true } } },
+    select: {
+      id: true,
+      data: true,
+      horarioInicio: true,
+      slots: true,
+      status: true,
+      servicos: { select: { servicoId: true } },
+    },
     orderBy: [{ data: "asc" }, { horarioInicio: "asc" }],
     skip,
     take: limit,
@@ -104,6 +112,19 @@ export async function POST(request: Request) {
 
   try {
     const agendamento = await prisma.$transaction(async (tx) => {
+      // Re-verifica disponibilidade atomicamente (previne double-booking simultâneo).
+      const ocupado = await tx.appointment.findFirst({
+        where: {
+          data: new Date(data),
+          horarioInicio: { in: horariosNecessarios },
+          status: { notIn: ["cancelado"] },
+        },
+        select: { id: true },
+      });
+      if (ocupado) {
+        throw new Error(slotsNecessarios >= 2 ? "CONFLITO_2_SLOTS" : "CONFLITO_SLOT");
+      }
+
       // Cria ou reaproveita o cliente pelo telefone
       const cliente = await tx.client.upsert({
         where: { telefone },
@@ -152,7 +173,7 @@ export async function POST(request: Request) {
       });
 
       return novo;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     // Invalida o cache de slots da data agendada
     revalidateTag(`slots-${data}`, {});
@@ -169,6 +190,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: agendamento.id, codigo }, { status: 201 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "";
+    if (msg === "CONFLITO_SLOT") {
+      return NextResponse.json(
+        { error: "Esse horário acabou de ser preenchido. Escolha outro." },
+        { status: 409 }
+      );
+    }
+    if (msg === "CONFLITO_2_SLOTS") {
+      return NextResponse.json(
+        { error: "Esse serviço precisa de 2 horários seguidos livres. Escolha outro." },
+        { status: 409 }
+      );
+    }
     if (msg === "BLOQUEADO") {
       return NextResponse.json(
         {

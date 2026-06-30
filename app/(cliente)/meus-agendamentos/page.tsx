@@ -238,6 +238,7 @@ export default function MeusAgendamentosPage() {
 // ─── Cartão de agendamento ──────────────────────────────────────────────────
 function CartaoAgendamento({
   agendamento: a,
+  telefone,
   onMudou,
 }: {
   agendamento: Agendamento;
@@ -253,7 +254,7 @@ function CartaoAgendamento({
       const res = await fetch(`/api/agendamentos/${a.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao: "checkin" }),
+        body: JSON.stringify({ acao: "checkin", telefone }),
       });
       const dados = await res.json();
       if (!res.ok) throw new Error(dados.error ?? "Erro no check-in.");
@@ -271,7 +272,7 @@ function CartaoAgendamento({
       const res = await fetch(`/api/agendamentos/${a.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao: "cancelar" }),
+        body: JSON.stringify({ acao: "cancelar", telefone }),
       });
       const dados = await res.json();
       if (!res.ok) throw new Error(dados.error ?? "Erro ao cancelar.");
@@ -436,6 +437,7 @@ function CartaoAgendamento({
           open={avaliando}
           onOpenChange={setAvaliando}
           agendamentoId={a.id}
+          telefone={telefone}
           onAvaliado={() => onMudou()}
         />
 
@@ -444,6 +446,7 @@ function CartaoAgendamento({
           {remarcando && (
             <Remarcar
               id={a.id}
+              telefone={telefone}
               onFechar={() => setRemarcando(false)}
               onPronto={() => {
                 setRemarcando(false);
@@ -479,10 +482,12 @@ function dataISO(d: Date): string {
 
 function Remarcar({
   id,
+  telefone,
   onFechar,
   onPronto,
 }: {
   id: string;
+  telefone: string;
   onFechar: () => void;
   onPronto: () => void;
 }) {
@@ -505,7 +510,7 @@ function Remarcar({
       const res = await fetch(`/api/agendamentos/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao: "remarcar", data, horario }),
+        body: JSON.stringify({ acao: "remarcar", data, horario, telefone }),
       });
       const dados = await res.json();
       if (!res.ok) throw new Error(dados.error ?? "Erro ao remarcar.");

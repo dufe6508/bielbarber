@@ -18,8 +18,18 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Arquivo ausente" }, { status: 400 });
   }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Envie uma imagem" }, { status: 400 });
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return NextResponse.json({ error: "Formato não aceito. Use JPEG, PNG, WebP ou GIF." }, { status: 400 });
+  }
+  // Verifica magic bytes reais (primeiros 4 bytes) para rejeitar arquivos com extensão trocada.
+  const magic = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const isJpeg = magic[0] === 0xff && magic[1] === 0xd8;
+  const isPng  = magic[0] === 0x89 && magic[1] === 0x50 && magic[2] === 0x4e && magic[3] === 0x47;
+  const isWebp = magic[0] === 0x52 && magic[1] === 0x49 && magic[2] === 0x46 && magic[3] === 0x46;
+  const isGif  = magic[0] === 0x47 && magic[1] === 0x49 && magic[2] === 0x46;
+  if (!isJpeg && !isPng && !isWebp && !isGif) {
+    return NextResponse.json({ error: "Arquivo inválido." }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: "Imagem acima de 5 MB" }, { status: 400 });
