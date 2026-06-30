@@ -1,11 +1,26 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { motion, useReducedMotion, type Variants } from "motion/react";
-import { Check, Package as PackageIcon, Layers, Hash } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
+import {
+  Check,
+  Package as PackageIcon,
+  Layers,
+  Hash,
+  X,
+  Loader2,
+  CheckCircle2,
+} from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { formatarPreco } from "@/lib/utils/format";
+import { Input } from "@/components/ui/input";
+import {
+  formatarPreco,
+  formatarTelefone,
+  telefoneNumeros,
+  formatarData,
+} from "@/lib/utils/format";
+import { lembrarTelefone, telefoneLembrado } from "@/lib/utils/telefone";
 
 type PacoteServico = { servico: { id: string; nome: string } };
 type PacoteProduto = { quantidade: number; produto: { id: string; nome: string } };
@@ -17,12 +32,14 @@ type Pacote = {
   tipo: "quantidade" | "combo";
   preco: string;
   validadeDias: number | null;
+  quantidadeTotal: number | null;
   servicos: PacoteServico[];
   produtos: PacoteProduto[];
 };
 
 export default function PacotesPage() {
   const reduzir = useReducedMotion();
+  const [ativando, setAtivando] = useState<Pacote | null>(null);
   const { data, isLoading, isError } = useQuery<Pacote[]>({
     queryKey: ["pacotes"],
     queryFn: async () => {
@@ -154,9 +171,7 @@ export default function PacotesPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      toast.info("Fale com a barbearia para ativar o pacote.")
-                    }
+                    onClick={() => setAtivando(pkg)}
                     className="inline-flex h-11 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
                   >
                     Quero esse
@@ -169,7 +184,182 @@ export default function PacotesPage() {
       ) : (
         <EmptyPacotes />
       )}
+
+      <AnimatePresence>
+        {ativando && (
+          <AtivarPacoteModal pacote={ativando} onFechar={() => setAtivando(null)} />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+// ─── Modal de ativação de pacote ────────────────────────────────────────────
+type RespostaAtivacao = {
+  ok: true;
+  pacote: string;
+  usosTotais: number | null;
+  usosRestantes: number | null;
+  expiraEm: string | null;
+};
+
+function AtivarPacoteModal({
+  pacote,
+  onFechar,
+}: {
+  pacote: Pacote;
+  onFechar: () => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState(() => {
+    const t = telefoneLembrado();
+    return t ? formatarTelefone(t) : "";
+  });
+
+  const ativar = useMutation<RespostaAtivacao, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch("/api/pacotes/ativar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pacoteId: pacote.id, nome, telefone }),
+      });
+      const dados = await res.json();
+      if (!res.ok) throw new Error(dados.error ?? "Não foi possível ativar.");
+      return dados;
+    },
+    onSuccess: () => lembrarTelefone(telefoneNumeros(telefone)),
+  });
+
+  const podeAtivar = nome.trim().length >= 2 && telefoneNumeros(telefone).length >= 10;
+  const r = ativar.data;
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <button
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onFechar}
+        aria-label="Fechar"
+      />
+      <motion.div
+        initial={{ y: "4%", opacity: 0, scale: 0.98 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: "3%", opacity: 0, scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 360, damping: 32 }}
+        className="relative w-full max-w-md rounded-t-2xl border border-border bg-card p-6 shadow-2xl sm:rounded-2xl"
+      >
+        <button
+          onClick={onFechar}
+          className="absolute right-4 top-4 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Fechar"
+        >
+          <X className="size-4.5" />
+        </button>
+
+        {r ? (
+          // Confirmação — estilo ficha
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <CheckCircle2 className="size-7" />
+            </span>
+            <div>
+              <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                Pacote ativado!
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {r.pacote} — pagamento no local, na próxima visita.
+              </p>
+            </div>
+            <div className="w-full space-y-2 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-sm">
+              {r.usosTotais != null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Saldo</span>
+                  <span className="font-mono font-semibold tabular-nums text-foreground">
+                    {r.usosRestantes}/{r.usosTotais} cortes
+                  </span>
+                </div>
+              )}
+              {r.expiraEm && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Válido até</span>
+                  <span className="font-mono font-semibold tabular-nums text-foreground">
+                    {formatarData(r.expiraEm)}
+                  </span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={onFechar}
+              className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+            >
+              Fechar
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-primary">
+                {pacote.tipo === "combo" ? "Combo" : "Quantidade"}
+              </span>
+              <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight text-foreground">
+                Ativar {pacote.nome}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {pacote.quantidadeTotal
+                  ? `${pacote.quantidadeTotal} cortes`
+                  : "Combo de serviços"}
+                {pacote.validadeDias ? ` · válido por ${pacote.validadeDias} dias` : ""}. Você paga{" "}
+                <span className="font-semibold text-foreground">
+                  {formatarPreco(pacote.preco)}
+                </span>{" "}
+                no local.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Input
+                placeholder="Seu nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="h-12"
+              />
+              <Input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="(31) 99999-9999"
+                value={telefone}
+                onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+                className="h-12 font-mono tabular-nums"
+              />
+            </div>
+
+            {ativar.isError && (
+              <p className="text-sm text-destructive">{ativar.error.message}</p>
+            )}
+
+            <button
+              onClick={() => ativar.mutate()}
+              disabled={!podeAtivar || ativar.isPending}
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-40"
+            >
+              {ativar.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Ativar pacote"
+              )}
+            </button>
+            <p className="text-center text-[11px] text-muted-foreground">
+              Sem cobrança online. O pagamento é feito direto na barbearia.
+            </p>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 

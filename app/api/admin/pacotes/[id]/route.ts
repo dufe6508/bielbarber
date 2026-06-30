@@ -30,6 +30,8 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (b.preco !== undefined) data.preco = Number(b.preco);
   if (b.validadeDias !== undefined)
     data.validadeDias = b.validadeDias ? Number(b.validadeDias) : null;
+  if (b.quantidadeTotal !== undefined)
+    data.quantidadeTotal = b.quantidadeTotal ? Number(b.quantidadeTotal) : null;
   if (b.quantidadeMensal !== undefined)
     data.quantidadeMensal = b.quantidadeMensal ? Number(b.quantidadeMensal) : null;
   if (b.limiteSemanal !== undefined)

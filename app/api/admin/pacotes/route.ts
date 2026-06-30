@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       tipo: b.tipo === "quantidade" ? "quantidade" : "combo",
       preco: b.preco,
       validadeDias: b.validadeDias ? Number(b.validadeDias) : null,
+      quantidadeTotal: b.quantidadeTotal ? Number(b.quantidadeTotal) : null,
       quantidadeMensal: b.quantidadeMensal ? Number(b.quantidadeMensal) : null,
       limiteSemanal: b.limiteSemanal ? Number(b.limiteSemanal) : null,
       renovavel: Boolean(b.renovavel),

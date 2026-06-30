@@ -26,6 +26,7 @@ type Pacote = {
   tipo: "quantidade" | "combo";
   preco: string;
   validadeDias: number | null;
+  quantidadeTotal: number | null;
   quantidadeMensal: number | null;
   limiteSemanal: number | null;
   renovavel: boolean;
@@ -41,6 +42,7 @@ const VAZIO = {
   tipo: "combo" as "combo" | "quantidade",
   preco: 0,
   validadeDias: 30,
+  quantidadeTotal: 0,
   quantidadeMensal: 0,
   limiteSemanal: 0,
   renovavel: false,
@@ -95,6 +97,7 @@ export function PacotesManager() {
       tipo: p.tipo,
       preco: parseFloat(p.preco),
       validadeDias: p.validadeDias ?? 0,
+      quantidadeTotal: p.quantidadeTotal ?? 0,
       quantidadeMensal: p.quantidadeMensal ?? 0,
       limiteSemanal: p.limiteSemanal ?? 0,
       renovavel: p.renovavel,
@@ -210,6 +213,9 @@ export function PacotesManager() {
 
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Pill tom="azul">{p.tipo}</Pill>
+                {p.quantidadeTotal ? (
+                  <Pill tom="neutro">{p.quantidadeTotal} cortes</Pill>
+                ) : null}
                 {p.quantidadeMensal ? (
                   <Pill tom="neutro">{p.quantidadeMensal}/mês</Pill>
                 ) : null}
@@ -294,6 +300,20 @@ export function PacotesManager() {
               </button>
             ))}
           </div>
+
+          {form.tipo === "quantidade" && (
+            <Campo rotulo="Quantidade total de cortes (ex.: 5)">
+              <input
+                type="number"
+                min="1"
+                className={inputCls}
+                value={form.quantidadeTotal}
+                onChange={(e) =>
+                  setForm({ ...form, quantidadeTotal: Number(e.target.value) })
+                }
+              />
+            </Campo>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <Campo rotulo="Preço (R$)">

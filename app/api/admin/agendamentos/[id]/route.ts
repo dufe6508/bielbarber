@@ -3,6 +3,7 @@ import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getFidelidadeMeta } from "@/lib/utils/slots";
 import { notify } from "@/lib/notifications/notify";
+import { consumirPorAgendamento } from "@/lib/packages";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -80,6 +81,12 @@ export async function PATCH(request: Request, { params }: Ctx) {
       carimbos: completou ? meta : novo,
       faltam: completou ? 0 : meta - novo,
     });
+  }
+
+  // Consumo automático de pacote: ao concluir, desconta de um pacote ativo do
+  // cliente que cubra algum serviço do agendamento (sem efeito se não houver).
+  if (carimbar) {
+    void consumirPorAgendamento(id).catch(() => {});
   }
 
   // porCliente:false → notifica só o cliente (admin não alerta a si mesmo).

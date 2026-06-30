@@ -35,6 +35,12 @@ enum PackageType {
 enum ClientPackageStatus {
   ativo
   expirado
+  encerrado
+}
+
+enum PackageUsageOrigin {
+  automatico
+  manual
 }
 
 enum SubscriptionStatus {
@@ -162,6 +168,7 @@ model Service {
   agendamentoServicos AppointmentService[]
   pacoteServicos      PackageService[]
   galeriaCategorias   GalleryCategory[]
+  usosPacote          ClientPackageUsage[]
 
   @@map("servicos")
 }
@@ -238,6 +245,8 @@ model Package {
   tipo             PackageType
   preco            Decimal     @db.Decimal(10, 2)
   validadeDias     Int?        @map("validade_dias")
+  // Pacote de quantidade ("5 cortes"): total de usos concedidos na compra.
+  quantidadeTotal  Int?        @map("quantidade_total")
   // Planos recorrentes (assinatura): quantos usos por mês e teto por semana.
   quantidadeMensal Int?        @map("quantidade_mensal")
   limiteSemanal    Int?        @map("limite_semanal")
@@ -281,14 +290,34 @@ model ClientPackage {
   clienteId     String              @map("cliente_id")
   pacoteId      String              @map("pacote_id")
   compradoEm    DateTime            @default(now()) @map("comprado_em")
+  // Total de usos concedidos (snapshot da compra) e quantos ainda restam.
+  usosTotais    Int?                @map("usos_totais")
   usosRestantes Int?                @map("usos_restantes")
   expiraEm      DateTime?           @map("expira_em")
   status        ClientPackageStatus @default(ativo)
 
-  cliente Client  @relation(fields: [clienteId], references: [id])
-  pacote  Package @relation(fields: [pacoteId], references: [id])
+  cliente Client                @relation(fields: [clienteId], references: [id])
+  pacote  Package               @relation(fields: [pacoteId], references: [id])
+  usos    ClientPackageUsage[]
 
   @@map("cliente_pacotes")
+}
+
+// Histórico de utilização de um pacote — uma linha por corte descontado.
+// Base para o saldo, o controle de limite semanal e o extrato de uso.
+model ClientPackageUsage {
+  id              String             @id @default(uuid())
+  clientePacoteId String             @map("cliente_pacote_id")
+  servicoId       String?            @map("servico_id")
+  agendamentoId   String?            @map("agendamento_id")
+  origem          PackageUsageOrigin @default(manual)
+  usadoEm         DateTime           @default(now()) @map("usado_em")
+
+  clientePacote ClientPackage @relation(fields: [clientePacoteId], references: [id], onDelete: Cascade)
+  servico       Service?      @relation(fields: [servicoId], references: [id])
+
+  @@index([clientePacoteId])
+  @@map("cliente_pacote_usos")
 }
 
 model Subscription {
