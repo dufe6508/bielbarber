@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import type { ClientPackage, Package } from "@prisma/client";
+import { notify } from "@/lib/notifications/notify";
+
+// Abaixo deste saldo (e ainda > 0), avisa o cliente que o pacote está acabando.
+const SALDO_BAIXO = 1;
 
 // ─── Lógica de pacotes / assinaturas ────────────────────────────────────────
 // Controla saldo (usos restantes), validade, limite semanal e histórico de uso.
@@ -153,6 +157,17 @@ export async function registrarUso(
       },
     }),
   ]);
+
+  // Avisos automáticos: pacote concluído ou saldo acabando.
+  if (encerrado) {
+    void notify({ type: "pacote_encerrado", clientePacoteId }).catch(() => {});
+  } else if (restantesDepois != null && restantesDepois <= SALDO_BAIXO && restantesDepois > 0) {
+    void notify({
+      type: "pacote_saldo_baixo",
+      clientePacoteId,
+      restantes: restantesDepois,
+    }).catch(() => {});
+  }
 
   return { ok: true, usosRestantes: restantesDepois, encerrado };
 }

@@ -17,6 +17,11 @@ export type NotificationEvent =
   | { type: "pagamento_recebido"; tipo: "pedido" | "agendamento"; valor: number; clienteNome?: string }
   // ─── Assinaturas / mensalistas ────────────────────────────────────────────
   | { type: "assinatura_vencendo"; subscriptionId: string; daysLeft: number }
+  // ─── Pacotes ──────────────────────────────────────────────────────────────
+  | { type: "pacote_vencendo"; clientePacoteId: string; daysLeft: number }
+  | { type: "pacote_saldo_baixo"; clientePacoteId: string; restantes: number }
+  | { type: "pacote_encerrado"; clientePacoteId: string }
+  | { type: "pacote_expirado"; clientePacoteId: string }
   // ─── Loja ─────────────────────────────────────────────────────────────────
   | { type: "estoque_novo"; productId: string; slug: string }
   | { type: "estoque_baixo"; productId: string }

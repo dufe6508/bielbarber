@@ -26,6 +26,57 @@ async function jaNotificou(
   return Boolean(n);
 }
 
+// Dedup para notificações de cliente com um metadado específico.
+async function jaNotificouCliente(
+  chave: string,
+  valor: string | number,
+  desde: Date
+): Promise<boolean> {
+  const n = await prisma.notification.findFirst({
+    where: {
+      audiencia: "cliente",
+      criadoEm: { gte: desde },
+      metadata: { path: [chave], equals: valor },
+    },
+    select: { id: true },
+  });
+  return Boolean(n);
+}
+
+const PACOTE_VENCE_EM_DIAS = 3;
+
+// Pacotes vencendo/vencidos: marca os vencidos como expirados e avisa o
+// cliente; avisa também os que vencem nos próximos dias. Dedup 3 dias/pacote.
+export async function pacotesVencendo(): Promise<void> {
+  const agora = new Date();
+  const limite = new Date(agora.getTime() + PACOTE_VENCE_EM_DIAS * 24 * 60 * 60 * 1000);
+
+  // Vencidos ainda marcados como ativos → expira e avisa (transição única).
+  const vencidos = await prisma.clientPackage.findMany({
+    where: { status: "ativo", expiraEm: { lt: agora } },
+    select: { id: true },
+  });
+  for (const cp of vencidos) {
+    await prisma.clientPackage.update({ where: { id: cp.id }, data: { status: "expirado" } });
+    await notify({ type: "pacote_expirado", clientePacoteId: cp.id });
+  }
+
+  // Vencendo nos próximos dias (ativos).
+  const vencendo = await prisma.clientPackage.findMany({
+    where: { status: "ativo", expiraEm: { gte: agora, lte: limite } },
+    select: { id: true, expiraEm: true },
+  });
+  const tresDias = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  for (const cp of vencendo) {
+    if (!cp.expiraEm) continue;
+    if (await jaNotificouCliente("clientePacoteId", cp.id, tresDias)) continue;
+    const daysLeft = Math.ceil(
+      (cp.expiraEm.getTime() - agora.getTime()) / (24 * 60 * 60 * 1000)
+    );
+    await notify({ type: "pacote_vencendo", clientePacoteId: cp.id, daysLeft });
+  }
+}
+
 // Resumo do dia: cortes concluídos, pendências de pagamento, faturamento.
 export async function resumoDiario(): Promise<void> {
   const hoje = new Date();
@@ -111,4 +162,5 @@ export async function varredurasDiarias(): Promise<void> {
   await estoqueBaixo().catch((e) => console.error("[sweep] estoqueBaixo", e));
   await metaBatida().catch((e) => console.error("[sweep] metaBatida", e));
   await baixaOcupacao().catch((e) => console.error("[sweep] baixaOcupacao", e));
+  await pacotesVencendo().catch((e) => console.error("[sweep] pacotesVencendo", e));
 }

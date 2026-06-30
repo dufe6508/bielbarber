@@ -360,6 +360,90 @@ export async function montarSpecs(event: NotificationEvent): Promise<Notificatio
       ];
     }
 
+    // ─── Pacotes ──────────────────────────────────────────────────────────────
+    case "pacote_vencendo": {
+      const cp = await prisma.clientPackage.findUnique({
+        where: { id: event.clientePacoteId },
+        include: { pacote: { select: { nome: true } } },
+      });
+      if (!cp) return [];
+      return [
+        {
+          audiencia: "cliente",
+          clienteId: cp.clienteId,
+          categoria: "assinaturas",
+          prioridade: "normal",
+          titulo: "Pacote vencendo",
+          mensagem:
+            `Seu pacote ${cp.pacote.nome} vence em ${event.daysLeft} dia(s).` +
+            (cp.usosRestantes != null ? ` Ainda restam ${cp.usosRestantes} cortes.` : ""),
+          actionUrl: "/meus-agendamentos",
+          metadata: { clientePacoteId: cp.id, daysLeft: event.daysLeft },
+          prefFlag: "assinaturaVencendo",
+        },
+      ];
+    }
+
+    case "pacote_saldo_baixo": {
+      const cp = await prisma.clientPackage.findUnique({
+        where: { id: event.clientePacoteId },
+        include: { pacote: { select: { nome: true } } },
+      });
+      if (!cp) return [];
+      return [
+        {
+          audiencia: "cliente",
+          clienteId: cp.clienteId,
+          categoria: "assinaturas",
+          prioridade: "normal",
+          titulo: "Pacote acabando",
+          mensagem: `Restam apenas ${event.restantes} cortes no seu pacote ${cp.pacote.nome}.`,
+          actionUrl: "/meus-agendamentos",
+          metadata: { clientePacoteId: cp.id, restantes: event.restantes },
+        },
+      ];
+    }
+
+    case "pacote_encerrado": {
+      const cp = await prisma.clientPackage.findUnique({
+        where: { id: event.clientePacoteId },
+        include: { pacote: { select: { nome: true } }, cliente: { select: { nome: true } } },
+      });
+      if (!cp) return [];
+      return [
+        {
+          audiencia: "cliente",
+          clienteId: cp.clienteId,
+          categoria: "assinaturas",
+          prioridade: "normal",
+          titulo: "Pacote concluído",
+          mensagem: `Você usou todos os cortes do pacote ${cp.pacote.nome}.`,
+          actionUrl: "/pacotes",
+          metadata: { clientePacoteId: cp.id },
+        },
+      ];
+    }
+
+    case "pacote_expirado": {
+      const cp = await prisma.clientPackage.findUnique({
+        where: { id: event.clientePacoteId },
+        include: { pacote: { select: { nome: true } } },
+      });
+      if (!cp) return [];
+      return [
+        {
+          audiencia: "cliente",
+          clienteId: cp.clienteId,
+          categoria: "assinaturas",
+          prioridade: "normal",
+          titulo: "Pacote vencido",
+          mensagem: `Seu pacote ${cp.pacote.nome} venceu.`,
+          actionUrl: "/pacotes",
+          metadata: { clientePacoteId: cp.id },
+        },
+      ];
+    }
+
     // ─── Loja ─────────────────────────────────────────────────────────────────
     case "estoque_novo":
       return [
