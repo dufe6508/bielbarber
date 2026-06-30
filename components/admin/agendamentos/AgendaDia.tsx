@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { Pill } from "@/components/admin/primitives";
 import { AdminModal } from "@/components/admin/AdminModal";
+import { WhatsAppMenu } from "@/components/WhatsAppMenu";
 import {
   formatarPreco,
   formatarTelefone,
@@ -173,6 +174,11 @@ export function AgendaDia() {
       day: "2-digit",
       month: "long",
     });
+  })();
+  // Data curta (30/06) para as mensagens de WhatsApp.
+  const dataCurta = (() => {
+    const [, m, d] = data.split("-");
+    return `${d}/${m}`;
   })();
 
   const totalDia = ags
@@ -340,6 +346,29 @@ export function AgendaDia() {
                   {alvo.statusPagamento === "pago" ? "pago" : "pendente"}
                 </Pill>
               </div>
+            </div>
+
+            {/* WhatsApp — mensagens prontas para o cliente */}
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2">
+              <span className="text-xs text-muted-foreground">Avisar o cliente</span>
+              <WhatsAppMenu
+                telefone={alvo.cliente.telefone}
+                rotulo="WhatsApp"
+                align="right"
+                vars={{
+                  nome: alvo.cliente.nome,
+                  data: dataCurta,
+                  hora: alvo.horarioInicio,
+                  servico: alvo.servicos.join(", "),
+                }}
+                templates={[
+                  "confirmar_agendamento",
+                  "agendamento_realizado",
+                  "lembrete",
+                  "remarcado",
+                  "cancelamento",
+                ]}
+              />
             </div>
 
             {/* Status do atendimento */}

@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { AdminModal, ConfirmDialog, Campo, inputCls } from "@/components/admin/AdminModal";
 import { Pill } from "@/components/admin/primitives";
+import { WhatsAppMenu } from "@/components/WhatsAppMenu";
 import { CobrancasManager } from "@/components/admin/mensalistas/CobrancasManager";
 import { formatarPreco, formatarData, formatarTelefone } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -367,6 +368,13 @@ export function MensalistasManager() {
                       {m.atendimentosCiclo} {m.atendimentosCiclo === 1 ? "corte" : "cortes"} no ciclo
                     </p>
                   </div>
+
+                  {/* WhatsApp — cobrar mensalidade */}
+                  <WhatsAppMenu
+                    telefone={m.telefone}
+                    vars={{ nome: m.nome }}
+                    templates={["cobranca_mensalidade"]}
+                  />
 
                   {/* Emitir cobrança */}
                   <button

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { AdminModal, inputCls } from "@/components/admin/AdminModal";
 import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { Pill } from "@/components/admin/primitives";
+import { WhatsAppMenu } from "@/components/WhatsAppMenu";
 import { formatarPreco, formatarTelefone } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
@@ -173,11 +174,18 @@ function Conteudo({
           )}
           {p.mensalidade?.status === "ativo" && <Pill tom="azul">Mensalista</Pill>}
         </div>
-        <p className="mt-1 font-mono text-sm text-muted-foreground">
-          {formatarTelefone(p.telefone)}
-          <span className="mx-1.5">·</span>
-          <span className="text-xs">desde {cadastro}</span>
-        </p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="font-mono text-sm text-muted-foreground">
+            {formatarTelefone(p.telefone)}
+            <span className="mx-1.5">·</span>
+            <span className="text-xs">desde {cadastro}</span>
+          </p>
+          <WhatsAppMenu
+            telefone={p.telefone}
+            vars={{ nome: p.nome }}
+            templates={["aniversario"]}
+          />
+        </div>
         {p.bloqueado && p.motivoBloqueio && (
           <p className="mt-1.5 text-xs text-destructive">{p.motivoBloqueio}</p>
         )}
