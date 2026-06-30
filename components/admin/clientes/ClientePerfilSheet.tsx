@@ -51,7 +51,19 @@ type Perfil = {
     vencimento: string;
     descricao: string | null;
   } | null;
-  assinaturas: { nome: string; usosRestantes: number | null; expiraEm: string | null }[];
+  assinaturas: {
+    id: string;
+    nome: string;
+    usosTotais: number | null;
+    usosRestantes: number | null;
+    expiraEm: string | null;
+    status: "ativo" | "expirado" | "encerrado";
+    limiteSemanal: number | null;
+    usosNaSemana: number;
+    diasParaVencer: number | null;
+    bloqueado: boolean;
+    motivo: "expirado" | "encerrado" | "limite_semanal" | "inativo" | null;
+  }[];
   stats: {
     totalCortes: number;
     totalGasto: number;
@@ -216,13 +228,11 @@ function Conteudo({
             />
           )}
           {p.assinaturas.length > 0 ? (
-            p.assinaturas.map((a, i) => (
-              <Linha
-                key={i}
-                rotulo={a.nome}
-                valor={a.usosRestantes != null ? `${a.usosRestantes} usos` : "ativo"}
-              />
-            ))
+            <div className="space-y-2">
+              {p.assinaturas.map((a) => (
+                <PacoteSaldo key={a.id} a={a} telefone={p.telefone} onMudou={refetch} />
+              ))}
+            </div>
           ) : !p.mensalidade ? (
             <p className="text-xs text-muted-foreground">Sem assinaturas ou mensalidade.</p>
           ) : null}
@@ -274,6 +284,117 @@ function Conteudo({
 
       {/* Controle administrativo */}
       <Controle key={p.id} p={p} onMudou={refetch} onPatch={onPatch} onAbrirFotos={onAbrirFotos} />
+    </div>
+  );
+}
+
+type Assinatura = Perfil["assinaturas"][number];
+
+const MOTIVO_ROTULO: Record<string, string> = {
+  expirado: "Vencido",
+  encerrado: "Sem saldo",
+  limite_semanal: "Limite semanal atingido",
+  inativo: "Inativo",
+};
+
+// Card de saldo de um pacote: usos restantes, validade, limite semanal e
+// ações de uso/estorno manual + avisos por WhatsApp.
+function PacoteSaldo({
+  a,
+  telefone,
+  onMudou,
+}: {
+  a: Assinatura;
+  telefone: string;
+  onMudou: () => void;
+}) {
+  const [carregando, setCarregando] = useState<"usar" | "estornar" | null>(null);
+
+  async function acao(tipo: "usar" | "estornar") {
+    setCarregando(tipo);
+    try {
+      const res = await fetch(`/api/admin/pacotes-cliente/${a.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: tipo }),
+      });
+      const dados = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(dados.error ?? "Não foi possível.");
+        return;
+      }
+      toast.success(tipo === "usar" ? "Uso registrado." : "Uso estornado.");
+      onMudou();
+    } finally {
+      setCarregando(null);
+    }
+  }
+
+  const temSaldo = a.usosTotais != null;
+  const restante = a.usosRestantes ?? 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-semibold text-foreground">{a.nome}</p>
+        {a.status === "encerrado" ? (
+          <Pill tom="neutro">encerrado</Pill>
+        ) : a.bloqueado && a.motivo ? (
+          <Pill tom="amber">{MOTIVO_ROTULO[a.motivo] ?? "bloqueado"}</Pill>
+        ) : (
+          <Pill tom="verde">ativo</Pill>
+        )}
+      </div>
+
+      {/* Saldo grande */}
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <div>
+          {temSaldo ? (
+            <p className="font-mono text-2xl font-bold tabular-nums leading-none text-foreground">
+              {restante}
+              <span className="text-base font-medium text-muted-foreground">/{a.usosTotais}</span>
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">cortes</span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Combo ativo</p>
+          )}
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            {a.diasParaVencer != null && (
+              <span>
+                {a.diasParaVencer >= 0 ? `Vence em ${a.diasParaVencer} dias` : "Vencido"}
+              </span>
+            )}
+            {a.limiteSemanal != null && (
+              <span>
+                {a.usosNaSemana}/{a.limiteSemanal} nesta semana
+              </span>
+            )}
+          </div>
+        </div>
+        <WhatsAppMenu
+          telefone={telefone}
+          vars={{ saldo: restante }}
+          templates={["pacote_saldo", "pacote_vencimento"]}
+        />
+      </div>
+
+      {/* Ações */}
+      <div className="mt-3 flex gap-2 border-t border-border/50 pt-2.5">
+        <button
+          onClick={() => acao("usar")}
+          disabled={a.bloqueado || carregando != null}
+          className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary text-xs font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-40"
+        >
+          {carregando === "usar" ? <Loader2 className="size-3.5 animate-spin" /> : "Usar 1 corte"}
+        </button>
+        <button
+          onClick={() => acao("estornar")}
+          disabled={carregando != null}
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+        >
+          {carregando === "estornar" ? <Loader2 className="size-3.5 animate-spin" /> : "Estornar"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pacotesAtivosDoCliente } from "@/lib/packages";
 
 // GET /api/clientes/[telefone]/historico — histórico do cliente por telefone (sem login)
 export async function GET(
@@ -30,8 +31,21 @@ export async function GET(
     );
   }
 
+  const saldos = await pacotesAtivosDoCliente(cliente.id);
+
   return NextResponse.json({
     nome: cliente.nome,
+    pacotes: saldos.map((s) => ({
+      nome: s.pacoteNome,
+      usosTotais: s.usosTotais,
+      usosRestantes: s.usosRestantes,
+      expiraEm: s.expiraEm?.toISOString() ?? null,
+      status: s.status,
+      diasParaVencer: s.diasParaVencer,
+      limiteSemanal: s.limiteSemanal,
+      usosNaSemana: s.usosNaSemana,
+      bloqueado: s.bloqueado,
+    })),
     agendamentos: cliente.agendamentos.map((a) => ({
       id: a.id,
       data: a.data,

@@ -17,6 +17,7 @@ import {
   Scissors,
   Award,
   Star,
+  Package as PackageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
@@ -42,7 +43,22 @@ type Agendamento = {
   servicos: Servico[];
   rating: number | null;
 };
-type Resultado = { nome: string; agendamentos: Agendamento[] };
+type PacoteSaldoCliente = {
+  nome: string;
+  usosTotais: number | null;
+  usosRestantes: number | null;
+  expiraEm: string | null;
+  status: "ativo" | "expirado" | "encerrado";
+  diasParaVencer: number | null;
+  limiteSemanal: number | null;
+  usosNaSemana: number;
+  bloqueado: boolean;
+};
+type Resultado = {
+  nome: string;
+  pacotes?: PacoteSaldoCliente[];
+  agendamentos: Agendamento[];
+};
 
 // ─── Estado visual derivado do agendamento ──────────────────────────────────
 type Visual = {
@@ -193,6 +209,10 @@ export default function MeusAgendamentosPage() {
               consulta.data.agendamentos.filter((a) => a.status === "concluido").length
             }
           />
+
+          {consulta.data.pacotes && consulta.data.pacotes.length > 0 && (
+            <MeusPacotes pacotes={consulta.data.pacotes} />
+          )}
 
           {consulta.data.agendamentos.length === 0 ? (
             <EstadoVazio
@@ -579,6 +599,68 @@ function Remarcar({
         </button>
       </div>
     </motion.div>
+  );
+}
+
+// ─── Saldo de pacotes do cliente ────────────────────────────────────────────
+function MeusPacotes({ pacotes }: { pacotes: PacoteSaldoCliente[] }) {
+  return (
+    <div className="mt-4 space-y-2.5">
+      {pacotes.map((p, i) => {
+        const temSaldo = p.usosTotais != null;
+        const restante = p.usosRestantes ?? 0;
+        const encerrado = p.status === "encerrado";
+        const vencido = p.status === "expirado" || (p.diasParaVencer != null && p.diasParaVencer < 0);
+        const inativo = encerrado || vencido;
+        return (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className={cn(
+              "flex items-center gap-3 rounded-2xl border px-4 py-3",
+              inativo ? "border-border bg-muted/30 opacity-75" : "border-primary/30 bg-primary/[0.04]"
+            )}
+          >
+            <span
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                inativo ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground"
+              )}
+            >
+              <PackageIcon className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-heading text-base font-semibold tracking-tight text-foreground">
+                {p.nome}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {encerrado
+                  ? "Pacote concluído"
+                  : vencido
+                    ? "Pacote vencido"
+                    : p.diasParaVencer != null
+                      ? `Válido por mais ${p.diasParaVencer} dias`
+                      : "Ativo"}
+                {!inativo && p.limiteSemanal != null && (
+                  <> · {p.usosNaSemana}/{p.limiteSemanal} nesta semana</>
+                )}
+              </p>
+            </div>
+            {temSaldo && (
+              <div className="shrink-0 text-right">
+                <p className="font-mono text-xl font-bold tabular-nums leading-none text-foreground">
+                  {restante}
+                  <span className="text-sm font-medium text-muted-foreground">/{p.usosTotais}</span>
+                </p>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">cortes</p>
+              </div>
+            )}
+          </motion.div>
+        );
+      })}
+    </div>
   );
 }
 

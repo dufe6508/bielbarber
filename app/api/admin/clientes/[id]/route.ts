@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
+import { pacotesAtivosDoCliente } from "@/lib/packages";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -38,10 +39,6 @@ export async function GET(_request: Request, { params }: Ctx) {
         take: 1,
         select: { id: true, valor: true, status: true, vencimento: true, descricao: true },
       },
-      pacotesCliente: {
-        where: { status: "ativo" },
-        select: { pacote: { select: { nome: true } }, usosRestantes: true, expiraEm: true },
-      },
       agendamentos: {
         orderBy: [{ data: "desc" }, { horarioInicio: "desc" }],
         select: {
@@ -60,6 +57,9 @@ export async function GET(_request: Request, { params }: Ctx) {
   if (!c) {
     return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
   }
+
+  // Saldo completo dos pacotes (usos, validade, limite semanal, bloqueio).
+  const saldos = await pacotesAtivosDoCliente(c.id);
 
   const ags = c.agendamentos;
   const concluidos = ags.filter((a) => a.status === "concluido");
@@ -109,10 +109,18 @@ export async function GET(_request: Request, { params }: Ctx) {
           descricao: c.cobrancas[0].descricao,
         }
       : null,
-    assinaturas: c.pacotesCliente.map((p) => ({
-      nome: p.pacote.nome,
-      usosRestantes: p.usosRestantes,
-      expiraEm: p.expiraEm?.toISOString() ?? null,
+    assinaturas: saldos.map((s) => ({
+      id: s.id,
+      nome: s.pacoteNome,
+      usosTotais: s.usosTotais,
+      usosRestantes: s.usosRestantes,
+      expiraEm: s.expiraEm?.toISOString() ?? null,
+      status: s.status,
+      limiteSemanal: s.limiteSemanal,
+      usosNaSemana: s.usosNaSemana,
+      diasParaVencer: s.diasParaVencer,
+      bloqueado: s.bloqueado,
+      motivo: s.motivo,
     })),
     stats: {
       totalCortes,
