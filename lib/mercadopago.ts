@@ -53,6 +53,10 @@ export async function criarPreferencia(
     const { Preference } = await import("mercadopago");
     const pref = new Preference(await client());
     const base = baseUrl();
+    // back_urls/auto_return exigem URL pública https — o MP rejeita localhost
+    // (erro "auto_return invalid"). Em dev geramos a preferência sem eles.
+    const publico = base.startsWith("https://") && !base.includes("localhost");
+    const caminho = input.backUrlPath ?? "/mensalista";
 
     const res = await pref.create({
       body: {
@@ -69,12 +73,16 @@ export async function criarPreferencia(
         // Liga o pagamento à nossa cobrança — o webhook usa isto.
         external_reference: input.chargeId,
         notification_url: `${base}/api/pagamentos/mercadopago/webhook`,
-        back_urls: {
-          success: `${base}${input.backUrlPath ?? "/mensalista"}?pago=1`,
-          pending: `${base}${input.backUrlPath ?? "/mensalista"}?pendente=1`,
-          failure: `${base}${input.backUrlPath ?? "/mensalista"}?falhou=1`,
-        },
-        auto_return: "approved",
+        ...(publico
+          ? {
+              back_urls: {
+                success: `${base}${caminho}?pago=1`,
+                pending: `${base}${caminho}?pendente=1`,
+                failure: `${base}${caminho}?falhou=1`,
+              },
+              auto_return: "approved" as const,
+            }
+          : {}),
         statement_descriptor: "BIEL BARBER",
       },
     });

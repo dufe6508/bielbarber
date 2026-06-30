@@ -1,10 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Drawer } from "vaul";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Copy, Loader2, CalendarClock, Clock3, ExternalLink } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Loader2,
+  CalendarClock,
+  Clock3,
+  ExternalLink,
+  X,
+  ShieldCheck,
+  QrCode,
+  CreditCard,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatarPreco, formatarData } from "@/lib/utils/format";
 import type { ResultadoPagamento } from "@/components/MpPaymentBrick";
@@ -47,13 +57,25 @@ export function PagamentoDrawer({
 }) {
   const [etapa, setEtapa] = useState<Etapa>("form");
   const [pix, setPix] = useState<Pix | null>(null);
+  const [brickPronto, setBrickPronto] = useState(false);
+  // Mostra o fallback (Checkout Pro) se o Brick não carregar — comum quando
+  // sdk.mercadopago.com está bloqueado (adblock/extensão/rede).
+  const [mostrarFallback, setMostrarFallback] = useState(false);
+  const [redirecionando, setRedirecionando] = useState(false);
 
-  function handleOpenChange(v: boolean) {
-    onOpenChange(v);
-    if (!v) {
-      setEtapa("form");
-      setPix(null);
-    }
+  // Se o Brick não ficar pronto em 5s, oferece o checkout externo.
+  useEffect(() => {
+    if (!open || etapa !== "form" || brickPronto) return;
+    const t = setTimeout(() => setMostrarFallback(true), 5000);
+    return () => clearTimeout(t);
+  }, [open, etapa, brickPronto]);
+
+  function fechar() {
+    onOpenChange(false);
+    setEtapa("form");
+    setPix(null);
+    setBrickPronto(false);
+    setMostrarFallback(false);
   }
 
   function handleResult(r: ResultadoPagamento) {
@@ -65,37 +87,78 @@ export function PagamentoDrawer({
     if (r.tipo === "aprovado") {
       setEtapa("sucesso");
       onPago?.();
-      setTimeout(() => handleOpenChange(false), 2600);
+      setTimeout(fechar, 2600);
       return;
     }
-    // pendente (em análise)
     setEtapa("pendente");
     onPago?.();
   }
 
+  // Fallback: abre o Checkout Pro hospedado no Mercado Pago (não usa o SDK JS).
+  async function abrirCheckoutExterno() {
+    if (!chargeId) return;
+    setRedirecionando(true);
+    try {
+      const res = await fetch("/api/pagamentos/mercadopago/criar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargeId }),
+      });
+      const d = await res.json().catch(() => null);
+      if (d?.initPoint) {
+        window.location.href = d.initPoint;
+        return;
+      }
+      toast.error("Pagamento online indisponível agora. Fale com a barbearia.");
+    } catch {
+      toast.error("Falha ao abrir o pagamento. Tente de novo.");
+    } finally {
+      setRedirecionando(false);
+    }
+  }
+
   return (
-    <Drawer.Root open={open} onOpenChange={handleOpenChange}>
-      <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-40 bg-foreground/50 backdrop-blur-[2px]" />
-        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] max-w-md flex-col rounded-t-3xl border border-border bg-background outline-none">
-          <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-border" />
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[70] flex flex-col bg-background"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          {/* Topo */}
+          <header className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                Pagamento seguro · {barbearia}
+              </span>
+            </div>
+            <button
+              onClick={fechar}
+              aria-label="Fechar"
+              className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-5" />
+            </button>
+          </header>
 
-          <div className="overflow-y-auto px-6 pb-8 pt-4">
-            <Drawer.Title className="sr-only">Pagamento</Drawer.Title>
-
+          <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-5 py-6">
             <AnimatePresence mode="wait">
               {etapa === "form" && (
                 <Passo key="form">
-                  <CabecalhoValor
+                  <ValorGrande
                     total={total}
-                    legenda={legenda ?? (chargeId ? `Mensalidade · ${barbearia}` : "Total a pagar")}
+                    legenda={legenda ?? (chargeId ? `Pagamento · ${barbearia}` : "Total a pagar")}
                   />
+
                   {(vencimento || descricao) && (
-                    <div className="mt-4 space-y-1.5 rounded-xl border border-border bg-card p-3.5 text-sm">
+                    <div className="mt-5 space-y-2 rounded-xl border border-border bg-card p-4 text-sm">
                       {descricao && (
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-muted-foreground">Referente a</span>
-                          <span className="font-medium text-foreground">{descricao}</span>
+                          <span className="text-right font-medium text-foreground">{descricao}</span>
                         </div>
                       )}
                       {vencimento && (
@@ -111,13 +174,27 @@ export function PagamentoDrawer({
                     </div>
                   )}
 
-                  <div className="mt-6">
+                  {/* Métodos aceitos */}
+                  <div className="mt-5 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <QrCode className="size-4" /> Pix
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <CreditCard className="size-4" /> Cartão
+                    </span>
+                  </div>
+
+                  <div className="mt-4">
                     {chargeId ? (
                       <MpPaymentBrick
                         amount={total}
                         chargeId={chargeId}
+                        onReadyChange={setBrickPronto}
                         onResult={handleResult}
-                        onErro={(msg) => msg && toast.error(msg)}
+                        onErro={(msg) => {
+                          if (msg) toast.error(msg);
+                          setMostrarFallback(true);
+                        }}
                       />
                     ) : (
                       <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
@@ -125,19 +202,43 @@ export function PagamentoDrawer({
                       </p>
                     )}
                   </div>
+
+                  {/* Fallback: Checkout Pro hospedado (quando o SDK não carrega) */}
+                  {mostrarFallback && chargeId && (
+                    <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/30 p-4">
+                      <p className="text-xs text-muted-foreground">
+                        Formulário demorando ou bloqueado? Pague na página segura do
+                        Mercado Pago.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={abrirCheckoutExterno}
+                        disabled={redirecionando}
+                        className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {redirecionando ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <>
+                            Pagar no Mercado Pago <ExternalLink className="size-4" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </Passo>
               )}
 
               {etapa === "pix" && pix && (
                 <Passo key="pix">
-                  <CabecalhoValor total={total} legenda="Pague via Pix" />
+                  <ValorGrande total={total} legenda="Pague via Pix" />
                   <div className="mt-6 flex flex-col items-center">
                     {pix.qrCodeBase64 ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={`data:image/png;base64,${pix.qrCodeBase64}`}
                         alt="QR Code Pix"
-                        className="size-52 rounded-2xl border border-border bg-white p-2"
+                        className="size-60 rounded-2xl border border-border bg-white p-2"
                       />
                     ) : null}
                     <button
@@ -146,7 +247,7 @@ export function PagamentoDrawer({
                         navigator.clipboard?.writeText(pix.qrCode);
                         toast.success("Código Pix copiado");
                       }}
-                      className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+                      className="mt-5 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
                     >
                       <Copy className="size-4" />
                       Copiar código Pix
@@ -161,13 +262,13 @@ export function PagamentoDrawer({
                         Abrir no app do banco <ExternalLink className="size-3" />
                       </a>
                     )}
-                    <p className="mt-4 text-center text-xs text-muted-foreground">
+                    <p className="mt-5 text-center text-xs text-muted-foreground">
                       {textoPixRodape}
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleOpenChange(false)}
+                    onClick={fechar}
                     className="mt-7 h-12 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
                   >
                     Já paguei
@@ -177,7 +278,7 @@ export function PagamentoDrawer({
 
               {etapa === "pendente" && (
                 <Passo key="pendente">
-                  <div className="flex flex-col items-center gap-4 py-14 text-center">
+                  <div className="flex flex-col items-center gap-4 py-16 text-center">
                     <span className="flex size-16 items-center justify-center rounded-full bg-amber-500/12 text-amber-600 dark:text-amber-400">
                       <Clock3 className="size-8" />
                     </span>
@@ -191,7 +292,7 @@ export function PagamentoDrawer({
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleOpenChange(false)}
+                      onClick={fechar}
                       className="mt-2 h-11 rounded-xl border border-border bg-card px-6 text-sm font-medium text-foreground"
                     >
                       Fechar
@@ -202,7 +303,7 @@ export function PagamentoDrawer({
 
               {etapa === "sucesso" && (
                 <Passo key="sucesso">
-                  <div className="flex flex-col items-center gap-4 py-14 text-center">
+                  <div className="flex flex-col items-center gap-4 py-16 text-center">
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
@@ -217,18 +318,16 @@ export function PagamentoDrawer({
                       <p className="font-heading text-xl font-semibold tracking-tight text-foreground">
                         {tituloSucesso}
                       </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {textoSucesso}
-                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">{textoSucesso}</p>
                     </div>
                   </div>
                 </Passo>
               )}
             </AnimatePresence>
           </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -245,13 +344,13 @@ function Passo({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CabecalhoValor({ total, legenda }: { total: number; legenda: string }) {
+function ValorGrande({ total, legenda }: { total: number; legenda: string }) {
   return (
-    <div>
+    <div className="text-center">
       <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         {legenda}
       </p>
-      <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-foreground">
+      <p className="mt-1 font-mono text-4xl font-bold tabular-nums text-foreground">
         {formatarPreco(total)}
       </p>
     </div>

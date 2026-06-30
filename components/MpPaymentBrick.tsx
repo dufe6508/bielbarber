@@ -22,11 +22,13 @@ export function MpPaymentBrick({
   chargeId,
   onResult,
   onErro,
+  onReadyChange,
 }: {
   amount: number;
   chargeId: string;
   onResult: (r: ResultadoPagamento) => void;
   onErro: (msg?: string) => void;
+  onReadyChange?: (pronto: boolean) => void;
 }) {
   const [pronto, setPronto] = useState(false);
 
@@ -37,11 +39,16 @@ export function MpPaymentBrick({
     }
   }, []);
 
+  // Sem chave pública → sinaliza erro pra UI cair no fallback (Checkout Pro).
+  useEffect(() => {
+    if (!PUB) onErro("Pagamento no app indisponível");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!PUB) {
     return (
       <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
-        Pagamento online indisponível no momento. Tente mais tarde ou fale com
-        a barbearia.
+        Carregando opções de pagamento…
       </p>
     );
   }
@@ -73,7 +80,10 @@ export function MpPaymentBrick({
             },
           },
         }}
-        onReady={() => setPronto(true)}
+        onReady={() => {
+          setPronto(true);
+          onReadyChange?.(true);
+        }}
         onError={(e) => onErro(e?.message)}
         onSubmit={async ({ formData }) => {
           const res = await fetch("/api/pagamentos/mercadopago/processar", {
