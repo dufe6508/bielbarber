@@ -362,11 +362,13 @@ export function AgendaDia() {
                   servico: alvo.servicos.join(", "),
                 }}
                 templates={[
-                  "confirmar_agendamento",
                   "agendamento_realizado",
+                  "confirmacao_presenca",
+                  "agendamento_confirmado",
                   "lembrete",
                   "remarcado",
                   "cancelamento",
+                  "convite_reagendamento",
                 ]}
               />
             </div>

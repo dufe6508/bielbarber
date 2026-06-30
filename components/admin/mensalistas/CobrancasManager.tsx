@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { AdminModal, Campo } from "@/components/admin/AdminModal";
 import { Pill } from "@/components/admin/primitives";
+import { WhatsAppMenu } from "@/components/WhatsAppMenu";
 import { formatarPreco, formatarData, formatarTelefone } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
@@ -217,7 +218,19 @@ function CobrancaDetalheModal({
             </Pill>
           </div>
           <p className="mt-2 text-sm font-medium text-foreground">{cobranca.nome}</p>
-          <p className="text-xs text-muted-foreground">{formatarTelefone(cobranca.telefone)}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">{formatarTelefone(cobranca.telefone)}</p>
+            <WhatsAppMenu
+              telefone={cobranca.telefone}
+              align="right"
+              vars={{ nome: cobranca.nome, valor: formatarPreco(cobranca.valor) }}
+              templates={
+                aberta
+                  ? ["solicitacao_pagamento", "mensalidade_disponivel"]
+                  : ["pagamento_confirmado"]
+              }
+            />
+          </div>
           {cobranca.descricao && (
             <p className="mt-1 text-xs text-muted-foreground">{cobranca.descricao}</p>
           )}

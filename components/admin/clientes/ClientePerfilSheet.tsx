@@ -195,7 +195,7 @@ function Conteudo({
           <WhatsAppMenu
             telefone={p.telefone}
             vars={{ nome: p.nome }}
-            templates={["aniversario"]}
+            templates={["convite_reagendamento"]}
           />
         </div>
         {p.bloqueado && p.motivoBloqueio && (
@@ -230,7 +230,7 @@ function Conteudo({
           {p.assinaturas.length > 0 ? (
             <div className="space-y-2">
               {p.assinaturas.map((a) => (
-                <PacoteSaldo key={a.id} a={a} telefone={p.telefone} onMudou={refetch} />
+                <PacoteSaldo key={a.id} a={a} telefone={p.telefone} nomeCliente={p.nome} onMudou={refetch} />
               ))}
             </div>
           ) : !p.mensalidade ? (
@@ -302,10 +302,12 @@ const MOTIVO_ROTULO: Record<string, string> = {
 function PacoteSaldo({
   a,
   telefone,
+  nomeCliente,
   onMudou,
 }: {
   a: Assinatura;
   telefone: string;
+  nomeCliente: string;
   onMudou: () => void;
 }) {
   const [carregando, setCarregando] = useState<"usar" | "estornar" | null>(null);
@@ -373,8 +375,13 @@ function PacoteSaldo({
         </div>
         <WhatsAppMenu
           telefone={telefone}
-          vars={{ saldo: restante }}
-          templates={["pacote_saldo", "pacote_vencimento"]}
+          vars={{ nome: nomeCliente, saldo: restante }}
+          templates={[
+            "pacote_saldo",
+            "pacote_vencimento",
+            "pacote_ativado",
+            "pacote_encerrado",
+          ]}
         />
       </div>
 

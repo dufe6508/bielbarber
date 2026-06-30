@@ -369,11 +369,15 @@ export function MensalistasManager() {
                     </p>
                   </div>
 
-                  {/* WhatsApp — cobrar mensalidade */}
+                  {/* WhatsApp — cobrança da mensalidade */}
                   <WhatsAppMenu
                     telefone={m.telefone}
-                    vars={{ nome: m.nome }}
-                    templates={["cobranca_mensalidade"]}
+                    vars={{ nome: m.nome, valor: formatarPreco(m.totalCiclo) }}
+                    templates={[
+                      "mensalidade_disponivel",
+                      "solicitacao_pagamento",
+                      "pagamento_confirmado",
+                    ]}
                   />
 
                   {/* Emitir cobrança */}

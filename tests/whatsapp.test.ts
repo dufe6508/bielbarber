@@ -9,8 +9,8 @@ import {
 // A camada de WhatsApp alimenta os botões de mensagem rápida. Os corpos de
 // mensagem e o link wa.me precisam ficar estáveis (e prontos para a API futura).
 describe("montarMensagem", () => {
-  it("preenche nome, data e hora na confirmação", () => {
-    const msg = montarMensagem("confirmar_agendamento", {
+  it("preenche nome, data e hora na confirmação de presença", () => {
+    const msg = montarMensagem("confirmacao_presenca", {
       nome: "Pedro Silva",
       data: "30/06",
       hora: "10:00",
@@ -19,6 +19,17 @@ describe("montarMensagem", () => {
     expect(msg).not.toContain("Silva");
     expect(msg).toContain("30/06");
     expect(msg).toContain("10:00");
+  });
+
+  it("aplica padrões institucionais (empresa/endereço) sem precisar passar", () => {
+    const msg = montarMensagem("agendamento_realizado", {
+      nome: "Ana",
+      data: "01/07",
+      hora: "09:00",
+      servico: "Corte",
+    });
+    expect(msg).toContain("Biel Barber Shop");
+    expect(msg).toContain("Av. Serrinha");
   });
 
   it("inclui o saldo no aviso de saldo do pacote", () => {
@@ -62,8 +73,8 @@ describe("linkWhatsApp", () => {
 
 describe("linkTemplate", () => {
   it("gera link direto a partir do template", () => {
-    const url = linkTemplate("31999842829", "aniversario");
+    const url = linkTemplate("31999842829", "agendamento_realizado", { nome: "Ana" });
     expect(url.startsWith("https://wa.me/5531999842829?text=")).toBe(true);
-    expect(decodeURIComponent(url)).toContain("Feliz aniversário");
+    expect(decodeURIComponent(url)).toContain("Biel Barber Shop");
   });
 });
