@@ -24,7 +24,7 @@ const PASSOS = [
 
 const TOTAL_PASSOS = PASSOS.length;
 
-export function BookingStepper() {
+export function BookingStepper({ limite }: { limite: string }) {
   const booking = useBooking();
   const { passo, avancar, voltar, irPara } = booking;
   const [enviando, setEnviando] = useState(false);
@@ -240,7 +240,7 @@ export function BookingStepper() {
         exit={{ opacity: 0, x: -16 }}
         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
       >
-        {passo === 0 && <StepHorario />}
+        {passo === 0 && <StepHorario limite={limite} />}
         {passo === 1 && <StepServicos />}
         {passo === 2 && <StepIdentificacao />}
         {passo === 3 && <StepPagamento />}

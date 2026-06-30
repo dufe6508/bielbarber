@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { dataISOLocal, nomeMesAno } from "@/lib/utils/format";
+import { dataISOLocal, formatarData, nomeMesAno } from "@/lib/utils/format";
 import { prefetchSlots } from "@/lib/queries/slots";
 import { cn } from "@/lib/utils";
 
@@ -22,21 +22,33 @@ type Props = {
   open: boolean;
   onClose: () => void;
   selected: string | null;
+  limite: string; // última data aberta pelo barbeiro (YYYY-MM-DD)
   onSelect: (iso: string) => void;
 };
 
-export function CalendarSheet({ open, onClose, selected, onSelect }: Props) {
+export function CalendarSheet({ open, onClose, selected, limite, onSelect }: Props) {
   const client = useQueryClient();
   const hoje = inicioDoDia(new Date());
+  const limiteDia = (() => {
+    const [a, m, d] = limite.split("-").map(Number);
+    return inicioDoDia(new Date(a, m - 1, d));
+  })();
   const [mesAtivo, setMesAtivo] = useState(() => {
     const base = selected ? new Date(selected + "T00:00:00") : hoje;
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
 
+  // índice ano*12+mês — pra comparar meses sem confusão de fuso
+  const idxMes = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+
   // Não deixa navegar para meses já passados
   const mesAnteriorBloqueado =
     mesAtivo.getFullYear() === hoje.getFullYear() &&
     mesAtivo.getMonth() === hoje.getMonth();
+  // Nem além do mês do horizonte aberto
+  const proximoMesBloqueado = idxMes(mesAtivo) >= idxMes(limiteDia);
+  // Este mês tem algum dia ainda não liberado (mostra o aviso)
+  const mesTemDiaFechado = idxMes(mesAtivo) >= idxMes(limiteDia);
 
   const primeiroDiaSemana = mesAtivo.getDay();
   const diasNoMes = new Date(
@@ -125,8 +137,9 @@ export function CalendarSheet({ open, onClose, selected, onSelect }: Props) {
                 <button
                   type="button"
                   onClick={() => mudarMes(1)}
+                  disabled={proximoMesBloqueado}
                   aria-label="Próximo mês"
-                  className="flex size-9 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted"
+                  className="flex size-9 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent"
                 >
                   <ChevronRight className="size-4" />
                 </button>
@@ -159,8 +172,9 @@ export function CalendarSheet({ open, onClose, selected, onSelect }: Props) {
                 if (!d) return <div key={`v-${i}`} />;
                 const iso = dataISOLocal(d);
                 const passado = inicioDoDia(d) < hoje;
+                const aposLimite = inicioDoDia(d) > limiteDia;
                 const folga = FOLGA.has(d.getDay());
-                const indisponivel = passado || folga;
+                const indisponivel = passado || folga || aposLimite;
                 const ativo = selected === iso;
                 const ehHoje = inicioDoDia(d).getTime() === hoje.getTime();
                 return (
@@ -191,7 +205,9 @@ export function CalendarSheet({ open, onClose, selected, onSelect }: Props) {
             </div>
 
             <p className="mt-4 text-center text-xs text-muted-foreground">
-              Atendemos de terça a sábado.
+              {mesTemDiaFechado
+                ? `Agenda aberta até ${formatarData(limite)}. Os demais dias ainda não foram liberados.`
+                : "Atendemos de terça a sábado."}
             </p>
           </motion.div>
         </motion.div>

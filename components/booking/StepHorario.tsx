@@ -76,15 +76,33 @@ function agruparPorPeriodo(slots: string[]) {
   return grupos.filter((g) => g.itens.length > 0);
 }
 
-export function StepHorario() {
+export function StepHorario({ limite }: { limite: string }) {
   const { data, horario, horarioFim, setData, setHorario } = useBooking();
   const slotsNecessarios = useBooking((s) => s.slotsNecessarios());
   const client = useQueryClient();
   const reduzir = useReducedMotion();
+
+  // Quantos dias à frente o barbeiro abriu a agenda (horizonte). A régua e o
+  // calendário param aqui — não dá pra marcar além disso.
+  const maxDias = useMemo(() => {
+    const [a, m, d] = limite.split("-").map(Number);
+    const alvo = new Date(a, m - 1, d);
+    alvo.setHours(0, 0, 0, 0);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000));
+  }, [limite]);
+
   const [qtdDias, setQtdDias] = useState(30);
-  const dias = useMemo(() => proximosDias(qtdDias), [qtdDias]);
+  const dias = useMemo(
+    () => proximosDias(Math.min(qtdDias, maxDias + 1)),
+    [qtdDias, maxDias]
+  );
+  const noFim = dias.length >= maxDias + 1; // régua chegou no horizonte
   const stripRef = useRef<HTMLDivElement>(null);
   const [agendaAberta, setAgendaAberta] = useState(false);
+  // mês exibido no topo — segue o dia centralizado na régua (não só o selecionado)
+  const [isoVisivel, setIsoVisivel] = useState<string | null>(null);
 
   // Auto-seleciona o primeiro dia e pré-carrega os próximos — slots aparecem na hora
   useEffect(() => {
@@ -107,13 +125,30 @@ export function StepHorario() {
     return () => el.removeEventListener("wheel", aoWheel);
   }, []);
 
-  // Régua infinita: ao chegar perto do fim, gera mais dias (sem limite de data)
+  // Régua: ao chegar perto do fim, gera mais dias até o horizonte (e para).
+  // Também atualiza o mês do topo conforme o dia centralizado.
   function aoRolar() {
     const el = stripRef.current;
     if (!el) return;
-    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 240) {
-      setQtdDias((q) => q + 30);
+    if (
+      qtdDias <= maxDias &&
+      el.scrollLeft + el.clientWidth >= el.scrollWidth - 240
+    ) {
+      setQtdDias((q) => Math.min(q + 30, maxDias + 1));
     }
+    // mês do topo = dia mais próximo do centro visível
+    const centro = el.scrollLeft + el.clientWidth / 2;
+    let melhor: string | null = null;
+    let menor = Infinity;
+    el.querySelectorAll<HTMLElement>("[data-iso]").forEach((f) => {
+      const c = f.offsetLeft + f.offsetWidth / 2;
+      const dist = Math.abs(c - centro);
+      if (dist < menor) {
+        menor = dist;
+        melhor = f.dataset.iso ?? null;
+      }
+    });
+    if (melhor) setIsoVisivel(melhor);
   }
 
   // Dias corridos entre hoje e uma data ISO (para saber se está na régua).
@@ -130,9 +165,10 @@ export function StepHorario() {
   // na régua; a centralização fica a cargo do efeito abaixo.
   function selecionarData(iso: string) {
     setData(iso);
+    setIsoVisivel(iso);
     prefetchSlots(client, iso);
     const diff = diasAteHoje(iso);
-    if (diff >= qtdDias) setQtdDias(diff + 3);
+    if (diff >= qtdDias) setQtdDias(Math.min(diff + 3, maxDias + 1));
   }
 
   // Sempre que a data muda, centraliza o dia ativo na régua (inclusive quando
@@ -152,8 +188,8 @@ export function StepHorario() {
   const { data: slots, isLoading } = useQuery(slotsQueryOptions(data));
   const grupos = useMemo(() => (slots ? agruparPorPeriodo(slots) : []), [slots]);
 
-  // mês exibido = mês do dia selecionado (ou primeiro da régua)
-  const mesRotulo = nomeMesAno(data ?? dataISOLocal(dias[0]));
+  // mês exibido = dia centralizado na régua (cai pro selecionado/1º antes do 1º scroll)
+  const mesRotulo = nomeMesAno(isoVisivel ?? data ?? dataISOLocal(dias[0]));
 
   function rolar(dir: -1 | 1) {
     stripRef.current?.scrollBy({ left: dir * 280, behavior: "smooth" });
@@ -295,6 +331,13 @@ export function StepHorario() {
         </div>
       </div>
 
+      {/* Régua chegou no horizonte aberto pelo barbeiro */}
+      {noFim && (
+        <p className="-mt-2 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground/70">
+          Agenda aberta até {formatarData(limite)}
+        </p>
+      )}
+
       {/* Aviso: serviço de coloração ocupa 2 horários seguidos */}
       {slotsNecessarios >= 2 && !diaFechado && (
         <motion.div
@@ -432,6 +475,7 @@ export function StepHorario() {
         open={agendaAberta}
         onClose={() => setAgendaAberta(false)}
         selected={data}
+        limite={limite}
         onSelect={(iso) => selecionarData(iso)}
       />
     </div>
