@@ -57,6 +57,14 @@ enum ChargeStatus {
   expirado // preferência MP expirou sem pagamento
 }
 
+// O que a cobrança paga. Generaliza o motor de cobrança além do mensalista.
+enum ChargeType {
+  mensalista
+  pacote
+  agendamento
+  pedido
+}
+
 // Como o pagamento foi feito (espelha métodos do Mercado Pago + manual).
 enum ChargeMethod {
   pix
@@ -344,8 +352,17 @@ model Subscription {
 // integração Mercado Pago sem exigir mudança de schema depois.
 model SubscriptionCharge {
   id           String       @id @default(uuid())
-  mensalistaId String       @map("mensalista_id")
+  tipo         ChargeType   @default(mensalista)
+  mensalistaId String?      @map("mensalista_id") // nulo em cobrança de pacote
   clienteId    String       @map("cliente_id")
+  // Cobrança de pacote: o pacote a ativar e o ClientPackage criado ao confirmar.
+  // ponytail: colunas simples sem FK — ClientPackage nem existe na criação da
+  // cobrança (ativado só pós-pagamento). Vira relação se a integridade pesar.
+  pacoteId        String? @map("pacote_id")
+  clientePacoteId String? @map("cliente_pacote_id")
+  // Cobrança avulsa de agendamento / pedido da loja: vínculo p/ baixar o certo.
+  agendamentoId   String? @map("agendamento_id")
+  pedidoId        String? @map("pedido_id")
   valor        Decimal      @db.Decimal(10, 2)
   status       ChargeStatus @default(pendente)
   vencimento   DateTime     @db.Date
@@ -367,8 +384,8 @@ model SubscriptionCharge {
   criadoEm      DateTime  @default(now()) @map("criado_em")
   atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
 
-  mensalista Subscription @relation(fields: [mensalistaId], references: [id], onDelete: Cascade)
-  cliente    Client       @relation(fields: [clienteId], references: [id])
+  mensalista Subscription? @relation(fields: [mensalistaId], references: [id], onDelete: Cascade)
+  cliente    Client        @relation(fields: [clienteId], references: [id])
 
   @@index([clienteId, status])
   @@index([mensalistaId, status])

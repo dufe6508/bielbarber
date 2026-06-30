@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
 import { notify } from "@/lib/notifications/notify";
 import { sincronizarAgenda } from "@/lib/calendar";
+import { criarCobrancaAgendamento } from "@/lib/billing/charges";
 
 import { z } from "zod";
 
@@ -142,7 +143,11 @@ export async function POST(request: Request) {
       // Cobrança em aberto (pendente/vencido) trava novos agendamentos:
       // o cliente precisa quitar a mensalidade antes de marcar de novo.
       const cobrancaAberta = await tx.subscriptionCharge.findFirst({
-        where: { clienteId: cliente.id, status: { in: ["pendente", "vencido"] } },
+        where: {
+          clienteId: cliente.id,
+          tipo: "mensalista",
+          status: { in: ["pendente", "vencido"] },
+        },
         select: { id: true },
       });
       if (cobrancaAberta) {
@@ -192,7 +197,27 @@ export async function POST(request: Request) {
     // Código curto para o ticket
     const codigo = agendamento.id.slice(0, 8).toUpperCase();
 
-    return NextResponse.json({ id: agendamento.id, codigo }, { status: 201 });
+    // Pagamento online (pix/cartão): gera a cobrança e devolve o chargeId para
+    // o checkout. Local/mensalista seguem sem cobrança (paga no local / no ciclo).
+    let chargeId: string | null = null;
+    if (formaFinal === "pix" || formaFinal === "cartao") {
+      const descricao = servicos.map((s) => s.nome).join(", ");
+      const charge = await criarCobrancaAgendamento(
+        agendamento.clienteId,
+        agendamento.id,
+        valorTotal,
+        descricao
+      ).catch((e) => {
+        console.error("[agendamentos] falha ao criar cobrança", e);
+        return null;
+      });
+      chargeId = charge?.id ?? null;
+    }
+
+    return NextResponse.json(
+      { id: agendamento.id, codigo, chargeId, valor: valorTotal },
+      { status: 201 }
+    );
   } catch (error) {
     const msg = error instanceof Error ? error.message : "";
     if (msg === "CONFLITO_SLOT") {

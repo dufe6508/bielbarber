@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
 import {
   Check,
@@ -10,17 +12,16 @@ import {
   Hash,
   X,
   Loader2,
-  CheckCircle2,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { PagamentoDrawer } from "@/components/PagamentoDrawer";
 import { Input } from "@/components/ui/input";
 import {
   formatarPreco,
   formatarTelefone,
   telefoneNumeros,
-  formatarData,
 } from "@/lib/utils/format";
-import { lembrarTelefone, telefoneLembrado } from "@/lib/utils/telefone";
+import { lembrarTelefone, telefoneLembrado, lembrarNome, nomeLembrado } from "@/lib/utils/telefone";
 
 type PacoteServico = { servico: { id: string; nome: string } };
 type PacoteProduto = { quantidade: number; produto: { id: string; nome: string } };
@@ -38,8 +39,29 @@ type Pacote = {
 };
 
 export default function PacotesPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const reduzir = useReducedMotion();
   const [ativando, setAtivando] = useState<Pacote | null>(null);
+
+  // Lida com redirect do Mercado Pago (back_urls)
+  useEffect(() => {
+    const pago = searchParams.get("pago");
+    const pendente = searchParams.get("pendente");
+    const falhou = searchParams.get("falhou");
+    if (pago) {
+      toast.success("Pacote ativado!", { description: "Seu pacote está liberado. É só agendar." });
+      router.replace("/pacotes");
+    } else if (pendente) {
+      toast.info("Pagamento em análise.", { description: "O pacote será ativado assim que confirmar." });
+      router.replace("/pacotes");
+    } else if (falhou) {
+      toast.error("Pagamento não aprovado.", { description: "Tente novamente ou use outro método." });
+      router.replace("/pacotes");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data, isLoading, isError } = useQuery<Pacote[]>({
     queryKey: ["pacotes"],
     queryFn: async () => {
@@ -195,12 +217,10 @@ export default function PacotesPage() {
 }
 
 // ─── Modal de ativação de pacote ────────────────────────────────────────────
-type RespostaAtivacao = {
-  ok: true;
+type RespostaCobranca = {
+  chargeId: string;
   pacote: string;
-  usosTotais: number | null;
-  usosRestantes: number | null;
-  expiraEm: string | null;
+  valor: number;
 };
 
 function AtivarPacoteModal({
@@ -210,28 +230,53 @@ function AtivarPacoteModal({
   pacote: Pacote;
   onFechar: () => void;
 }) {
-  const [nome, setNome] = useState("");
+  const [nome, setNome] = useState(() => nomeLembrado());
   const [telefone, setTelefone] = useState(() => {
     const t = telefoneLembrado();
     return t ? formatarTelefone(t) : "";
   });
 
-  const ativar = useMutation<RespostaAtivacao, Error, void>({
+  const ativar = useMutation<RespostaCobranca, Error, void>({
     mutationFn: async () => {
       const res = await fetch("/api/pacotes/ativar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pacoteId: pacote.id, nome, telefone }),
       });
-      const dados = await res.json();
-      if (!res.ok) throw new Error(dados.error ?? "Não foi possível ativar.");
+      const dados = await res.json().catch(() => null);
+      if (!res.ok || !dados) {
+        throw new Error(dados?.error ?? "Não foi possível continuar. Tente novamente.");
+      }
       return dados;
     },
-    onSuccess: () => lembrarTelefone(telefoneNumeros(telefone)),
+    onSuccess: () => {
+      lembrarTelefone(telefoneNumeros(telefone));
+      lembrarNome(nome);
+    },
   });
 
   const podeAtivar = nome.trim().length >= 2 && telefoneNumeros(telefone).length >= 10;
   const r = ativar.data;
+
+  // Cobrança criada → checkout online (Pix/cartão). O pacote é ativado só quando
+  // o pagamento confirma (cartão na hora, Pix via webhook).
+  if (r) {
+    return (
+      <PagamentoDrawer
+        open
+        onOpenChange={(v) => {
+          if (!v) onFechar();
+        }}
+        total={r.valor}
+        chargeId={r.chargeId}
+        descricao={r.pacote}
+        legenda={`Pacote · ${r.pacote}`}
+        textoPixRodape="Assim que o pagamento cair, seu pacote é ativado automaticamente."
+        tituloSucesso="Pacote ativado!"
+        textoSucesso={`${r.pacote} liberado. É só agendar.`}
+      />
+    );
+  }
 
   return (
     <motion.div
@@ -260,104 +305,63 @@ function AtivarPacoteModal({
           <X className="size-4.5" />
         </button>
 
-        {r ? (
-          // Confirmação — estilo ficha
-          <div className="flex flex-col items-center gap-4 py-4 text-center">
-            <span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <CheckCircle2 className="size-7" />
+        <div className="space-y-4">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-primary">
+              {pacote.tipo === "combo" ? "Combo" : "Quantidade"}
             </span>
-            <div>
-              <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
-                Pacote ativado!
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {r.pacote} — pagamento no local, na próxima visita.
-              </p>
-            </div>
-            <div className="w-full space-y-2 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-sm">
-              {r.usosTotais != null && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Saldo</span>
-                  <span className="font-mono font-semibold tabular-nums text-foreground">
-                    {r.usosRestantes}/{r.usosTotais} cortes
-                  </span>
-                </div>
-              )}
-              {r.expiraEm && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Válido até</span>
-                  <span className="font-mono font-semibold tabular-nums text-foreground">
-                    {formatarData(r.expiraEm)}
-                  </span>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={onFechar}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
-            >
-              Fechar
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-primary">
-                {pacote.tipo === "combo" ? "Combo" : "Quantidade"}
-              </span>
-              <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight text-foreground">
-                Ativar {pacote.nome}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {pacote.quantidadeTotal
-                  ? `${pacote.quantidadeTotal} cortes`
-                  : "Combo de serviços"}
-                {pacote.validadeDias ? ` · válido por ${pacote.validadeDias} dias` : ""}. Você paga{" "}
-                <span className="font-semibold text-foreground">
-                  {formatarPreco(pacote.preco)}
-                </span>{" "}
-                no local.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <Input
-                placeholder="Seu nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                className="h-12"
-              />
-              <Input
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel"
-                placeholder="(31) 99999-9999"
-                value={telefone}
-                onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
-                className="h-12 font-mono tabular-nums"
-              />
-            </div>
-
-            {ativar.isError && (
-              <p className="text-sm text-destructive">{ativar.error.message}</p>
-            )}
-
-            <button
-              onClick={() => ativar.mutate()}
-              disabled={!podeAtivar || ativar.isPending}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-40"
-            >
-              {ativar.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                "Ativar pacote"
-              )}
-            </button>
-            <p className="text-center text-[11px] text-muted-foreground">
-              Sem cobrança online. O pagamento é feito direto na barbearia.
+            <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight text-foreground">
+              Ativar {pacote.nome}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {pacote.quantidadeTotal
+                ? `${pacote.quantidadeTotal} cortes`
+                : "Combo de serviços"}
+              {pacote.validadeDias ? ` · válido por ${pacote.validadeDias} dias` : ""}. Você paga{" "}
+              <span className="font-semibold text-foreground">
+                {formatarPreco(pacote.preco)}
+              </span>{" "}
+              online (Pix ou cartão).
             </p>
           </div>
-        )}
+
+          <div className="space-y-3">
+            <Input
+              placeholder="Seu nome"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="h-12"
+            />
+            <Input
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              placeholder="(31) 99999-9999"
+              value={telefone}
+              onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+              className="h-12 font-mono tabular-nums"
+            />
+          </div>
+
+          {ativar.isError && (
+            <p className="text-sm text-destructive">{ativar.error.message}</p>
+          )}
+
+          <button
+            onClick={() => ativar.mutate()}
+            disabled={!podeAtivar || ativar.isPending}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-40"
+          >
+            {ativar.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              "Ir para o pagamento"
+            )}
+          </button>
+          <p className="text-center text-[11px] text-muted-foreground">
+            Pagamento online seguro via Mercado Pago.
+          </p>
+        </div>
       </motion.div>
     </motion.div>
   );

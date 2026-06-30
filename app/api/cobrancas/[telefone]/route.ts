@@ -22,8 +22,9 @@ export async function GET(
     return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
   }
 
+  // Só mensalidade: pacote/pedido/agendamento têm fluxo de pagamento próprio.
   const cobrancas = await prisma.subscriptionCharge.findMany({
-    where: { clienteId: cliente.id },
+    where: { clienteId: cliente.id, tipo: "mensalista" },
     orderBy: { criadoEm: "desc" },
     take: 50,
   });

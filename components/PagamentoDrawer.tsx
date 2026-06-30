@@ -27,6 +27,10 @@ export function PagamentoDrawer({
   vencimento,
   descricao,
   barbearia = "Biel Barber",
+  legenda,
+  textoPixRodape = "Assim que o pagamento cair, a mensalidade é baixada automaticamente.",
+  tituloSucesso = "Pagamento confirmado",
+  textoSucesso = "Mensalidade quitada. Até o próximo corte!",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -36,6 +40,10 @@ export function PagamentoDrawer({
   vencimento?: string | null;
   descricao?: string | null;
   barbearia?: string;
+  legenda?: string;
+  textoPixRodape?: string;
+  tituloSucesso?: string;
+  textoSucesso?: string;
 }) {
   const [etapa, setEtapa] = useState<Etapa>("form");
   const [pix, setPix] = useState<Pix | null>(null);
@@ -80,7 +88,7 @@ export function PagamentoDrawer({
                 <Passo key="form">
                   <CabecalhoValor
                     total={total}
-                    legenda={chargeId ? `Mensalidade · ${barbearia}` : "Total a pagar"}
+                    legenda={legenda ?? (chargeId ? `Mensalidade · ${barbearia}` : "Total a pagar")}
                   />
                   {(vencimento || descricao) && (
                     <div className="mt-4 space-y-1.5 rounded-xl border border-border bg-card p-3.5 text-sm">
@@ -154,8 +162,7 @@ export function PagamentoDrawer({
                       </a>
                     )}
                     <p className="mt-4 text-center text-xs text-muted-foreground">
-                      Assim que o pagamento cair, a mensalidade é baixada
-                      automaticamente.
+                      {textoPixRodape}
                     </p>
                   </div>
                   <button
@@ -208,10 +215,10 @@ export function PagamentoDrawer({
                     </motion.div>
                     <div>
                       <p className="font-heading text-xl font-semibold tracking-tight text-foreground">
-                        Pagamento confirmado
+                        {tituloSucesso}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Mensalidade quitada. Até o próximo corte!
+                        {textoSucesso}
                       </p>
                     </div>
                   </div>

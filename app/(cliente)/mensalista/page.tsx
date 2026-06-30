@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
@@ -79,6 +81,8 @@ const METODO_LABEL: Record<string, string> = {
 };
 
 export default function MensalistaPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [telefone, setTelefone] = useState("");
   const [pagar, setPagar] = useState(false);
   const [cobranca, setCobranca] = useState<CobrancaCliente | null>(null);
@@ -104,6 +108,24 @@ export default function MensalistaPage() {
       setCobranca(null);
     }
   }
+
+  // Lida com redirect do Mercado Pago (back_urls)
+  useEffect(() => {
+    const pago = searchParams.get("pago");
+    const pendente = searchParams.get("pendente");
+    const falhou = searchParams.get("falhou");
+    if (pago) {
+      toast.success("Pagamento confirmado!", { description: "Mensalidade quitada." });
+      router.replace("/mensalista");
+    } else if (pendente) {
+      toast.info("Pagamento em análise.", { description: "Você será avisado quando confirmar." });
+      router.replace("/mensalista");
+    } else if (falhou) {
+      toast.error("Pagamento não aprovado.", { description: "Tente novamente ou use outro método." });
+      router.replace("/mensalista");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Pré-preenche (e já entra) com o telefone usado no agendamento
   useEffect(() => {

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   AnimatePresence,
   motion,
@@ -14,10 +15,19 @@ import {
   ShoppingBag,
   ShoppingCart,
   Package as PackageIcon,
+  X,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
-import { formatarPreco } from "@/lib/utils/format";
+import { PagamentoDrawer } from "@/components/PagamentoDrawer";
+import { Input } from "@/components/ui/input";
+import {
+  formatarPreco,
+  formatarTelefone,
+  telefoneNumeros,
+} from "@/lib/utils/format";
+import { lembrarTelefone, telefoneLembrado, lembrarNome, nomeLembrado } from "@/lib/utils/telefone";
 
 type Produto = {
   id: string;
@@ -31,12 +41,44 @@ type Produto = {
 
 type Voo = { key: number; x: number; y: number; tx: number; ty: number; img: string | null };
 
+type RespostaPedido = { pedidoId: string; chargeId: string; valor: number };
+
 export default function LojaPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [carrinho, setCarrinho] = useState<Record<string, number>>({});
   const [voos, setVoos] = useState<Voo[]>([]);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [pagamentoAberto, setPagamentoAberto] = useState(false);
+  const [pedidoData, setPedidoData] = useState<RespostaPedido | null>(null);
+  const [nome, setNome] = useState(() =>
+    typeof window !== "undefined" ? nomeLembrado() : ""
+  );
+  const [telefone, setTelefone] = useState(() => {
+    const t = typeof window !== "undefined" ? telefoneLembrado() : null;
+    return t ? formatarTelefone(t) : "";
+  });
   const carrinhoRef = useRef<HTMLSpanElement>(null);
   const vooSeq = useRef(0);
   const reduzir = useReducedMotion();
+
+  // Lida com redirect do Mercado Pago (back_urls)
+  useEffect(() => {
+    const pago = searchParams.get("pago");
+    const pendente = searchParams.get("pendente");
+    const falhou = searchParams.get("falhou");
+    if (pago) {
+      toast.success("Pedido confirmado!", { description: "Retire seus produtos na barbearia." });
+      router.replace("/loja");
+    } else if (pendente) {
+      toast.info("Pagamento em análise.", { description: "Seu pedido será confirmado em breve." });
+      router.replace("/loja");
+    } else if (falhou) {
+      toast.error("Pagamento não aprovado.", { description: "Tente novamente ou use outro método." });
+      router.replace("/loja");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const gridVariants: Variants = {
     show: { transition: { staggerChildren: reduzir ? 0 : 0.035 } },
@@ -61,6 +103,36 @@ export default function LojaPage() {
     },
   });
 
+  const criarPedido = useMutation<RespostaPedido, Error, void>({
+    mutationFn: async () => {
+      if (!data) throw new Error("Produtos não carregados");
+      const itens = Object.entries(carrinho)
+        .filter(([, qtd]) => qtd > 0)
+        .map(([produtoId, quantidade]) => ({ produtoId, quantidade }));
+
+      const res = await fetch("/api/pedidos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome, telefone, itens }),
+      });
+      const dados = await res.json().catch(() => null);
+      if (!res.ok || !dados) {
+        throw new Error(dados?.error ?? "Não foi possível criar o pedido. Tente novamente.");
+      }
+      return dados;
+    },
+    onSuccess: (dados) => {
+      lembrarTelefone(telefoneNumeros(telefone));
+      lembrarNome(nome);
+      setPedidoData(dados);
+      setModalAberto(false);
+      setPagamentoAberto(true);
+    },
+    onError: (e) => {
+      toast.error(e.message);
+    },
+  });
+
   function ajustar(id: string, delta: number, estoque: number) {
     setCarrinho((prev) => {
       const atual = prev[id] ?? 0;
@@ -72,7 +144,6 @@ export default function LojaPage() {
     });
   }
 
-  // Adiciona + dispara o "voo" do produto até o carrinho
   function adicionar(e: React.MouseEvent<HTMLButtonElement>, p: Produto) {
     if (p.quantidadeEstoque <= (carrinho[p.id] ?? 0)) return;
     ajustar(p.id, 1, p.quantidadeEstoque);
@@ -101,11 +172,14 @@ export default function LojaPage() {
     return { totalItens: itens, totalPreco: preco };
   }, [carrinho, data]);
 
+  const podeContinuar =
+    nome.trim().length >= 2 && telefoneNumeros(telefone).length >= 10;
+
   return (
     <div className="mx-auto w-full max-w-5xl px-5 py-6 pb-28 md:px-8 md:py-12 md:pb-12">
       <PageHeader
         titulo="Loja"
-        descricao="Reserve seus produtos e retire na hora do corte. O pagamento é feito na barbearia."
+        descricao="Escolha seus produtos e pague online (Pix ou cartão). Retire na hora do corte."
       />
 
       {isError && (
@@ -160,7 +234,7 @@ export default function LojaPage() {
                     </div>
                   )}
 
-                  {/* Badges — top-left */}
+                  {/* Badges */}
                   <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
                     {semEstoque ? (
                       <span className="rounded-full bg-foreground/85 px-2 py-0.5 text-[10px] font-medium text-background backdrop-blur">
@@ -182,7 +256,7 @@ export default function LojaPage() {
                     )}
                   </div>
 
-                  {/* Add / Stepper — overlapping bottom-right (thumb zone) */}
+                  {/* Add / Stepper */}
                   <div className="absolute bottom-1.5 right-1.5">
                     {qtd === 0 ? (
                       <motion.button
@@ -235,7 +309,7 @@ export default function LojaPage() {
                   </div>
                 </div>
 
-                {/* Conteúdo — compacto */}
+                {/* Conteúdo */}
                 <div className="flex flex-1 flex-col p-2.5">
                   <h2 className="truncate font-heading text-[13px] font-semibold leading-tight tracking-tight text-foreground">
                     {p.nome}
@@ -265,7 +339,7 @@ export default function LojaPage() {
         <EmptyLoja />
       )}
 
-      {/* Barra de reserva (carrinho) */}
+      {/* Barra de checkout (carrinho) */}
       <AnimatePresence>
         {totalItens > 0 && (
           <motion.div
@@ -275,49 +349,45 @@ export default function LojaPage() {
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
             className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 px-5 md:bottom-6 md:left-64 md:px-8"
           >
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/80">
-            <div className="flex items-center gap-3">
-              <span
-                ref={carrinhoRef}
-                className="relative flex size-10 items-center justify-center rounded-xl bg-accent text-primary"
-              >
-                <motion.span
-                  key={totalItens}
-                  initial={{ scale: 0.5 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 16 }}
-                  className="flex"
+            <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/80">
+              <div className="flex items-center gap-3">
+                <span
+                  ref={carrinhoRef}
+                  className="relative flex size-10 items-center justify-center rounded-xl bg-accent text-primary"
                 >
-                  <ShoppingCart className="size-5" aria-hidden="true" />
-                </motion.span>
-              </span>
-              <div className="leading-tight">
-                <motion.p
-                  key={totalItens}
-                  initial={{ scale: 0.8, opacity: 0.6 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                  className="text-sm font-medium text-foreground"
-                >
-                  {totalItens} {totalItens === 1 ? "item" : "itens"}
-                </motion.p>
-                <p className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {formatarPreco(totalPreco)}
-                </p>
+                  <motion.span
+                    key={totalItens}
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 16 }}
+                    className="flex"
+                  >
+                    <ShoppingCart className="size-5" aria-hidden="true" />
+                  </motion.span>
+                </span>
+                <div className="leading-tight">
+                  <motion.p
+                    key={totalItens}
+                    initial={{ scale: 0.8, opacity: 0.6 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                    className="text-sm font-medium text-foreground"
+                  >
+                    {totalItens} {totalItens === 1 ? "item" : "itens"}
+                  </motion.p>
+                  <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {formatarPreco(totalPreco)}
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setModalAberto(true)}
+                className="inline-flex h-11 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+              >
+                Finalizar
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                toast.success("Reserva registrada! Retire na hora do corte.", {
-                  description: "Você paga na barbearia.",
-                })
-              }
-              className="inline-flex h-11 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
-            >
-              Reservar
-            </button>
-          </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -351,6 +421,125 @@ export default function LojaPage() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Modal de identificação (nome + telefone) */}
+      <AnimatePresence>
+        {modalAberto && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <button
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setModalAberto(false)}
+              aria-label="Fechar"
+            />
+            <motion.div
+              initial={{ y: "4%", opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: "3%", opacity: 0, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 360, damping: 32 }}
+              className="relative w-full max-w-md rounded-t-2xl border border-border bg-card p-6 shadow-2xl sm:rounded-2xl"
+            >
+              <button
+                onClick={() => setModalAberto(false)}
+                className="absolute right-4 top-4 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Fechar"
+              >
+                <X className="size-4.5" />
+              </button>
+
+              <div className="space-y-4">
+                <div>
+                  <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                    Finalizar pedido
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {totalItens} {totalItens === 1 ? "item" : "itens"} ·{" "}
+                    <span className="font-mono font-semibold text-foreground">
+                      {formatarPreco(totalPreco)}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Resumo */}
+                <div className="rounded-xl border border-border bg-background/50 p-3 text-sm">
+                  {(data ?? [])
+                    .filter((p) => (carrinho[p.id] ?? 0) > 0)
+                    .map((p) => (
+                      <div key={p.id} className="flex items-center justify-between gap-2 py-0.5">
+                        <span className="text-foreground">
+                          {carrinho[p.id]}× {p.nome}
+                        </span>
+                        <span className="font-mono tabular-nums text-muted-foreground">
+                          {formatarPreco(Number(p.preco) * (carrinho[p.id] ?? 0))}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+
+                <div className="space-y-3">
+                  <Input
+                    placeholder="Seu nome"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    className="h-12"
+                  />
+                  <Input
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    placeholder="(31) 99999-9999"
+                    value={telefone}
+                    onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+                    className="h-12 font-mono tabular-nums"
+                  />
+                </div>
+
+                {criarPedido.isError && (
+                  <p className="text-sm text-destructive">{criarPedido.error.message}</p>
+                )}
+
+                <button
+                  onClick={() => criarPedido.mutate()}
+                  disabled={!podeContinuar || criarPedido.isPending}
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-40"
+                >
+                  {criarPedido.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    "Ir para o pagamento"
+                  )}
+                </button>
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Pagamento online seguro via Mercado Pago. Retire na barbearia.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Drawer de pagamento */}
+      {pedidoData && (
+        <PagamentoDrawer
+          open={pagamentoAberto}
+          onOpenChange={setPagamentoAberto}
+          total={pedidoData.valor}
+          chargeId={pedidoData.chargeId}
+          descricao={`Pedido Loja · ${totalItens} ${totalItens === 1 ? "item" : "itens"}`}
+          legenda="Pedido · Biel Barber"
+          textoPixRodape="Assim que o pagamento cair, seu pedido é confirmado automaticamente."
+          tituloSucesso="Pedido confirmado!"
+          textoSucesso="Retire seus produtos na hora do corte."
+          onPago={() => {
+            setCarrinho({});
+            setPedidoData(null);
+          }}
+        />
+      )}
     </div>
   );
 }

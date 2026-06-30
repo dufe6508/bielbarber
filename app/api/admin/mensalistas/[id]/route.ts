@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { ChargeMethod } from "@prisma/client";
+import {
+  emitirCobranca,
+  confirmarPagamento,
+} from "@/lib/billing/charges";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -11,8 +16,7 @@ function proximaCobranca(dia: number, ref = new Date()): Date {
 }
 
 // PATCH — ações no mensalista.
-//   { acao:"marcar_pago" }  → fecha o ciclo: marca atendimentos pendentes como pagos,
-//                              registra o pagamento e reinicia o ciclo.
+//   { acao:"marcar_pago", metodo? }  → emite cobrança (se não existir) e confirma
 //   { acao:"status", status:"ativo"|"inativo" }
 //   { diaCobranca:10|30 }
 export async function PATCH(request: Request, { params }: Ctx) {
@@ -26,37 +30,33 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (!sub) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
 
   if (b?.acao === "marcar_pago") {
-    const pend = await prisma.appointment.findMany({
-      where: {
-        clienteId: sub.clienteId,
-        statusPagamento: "pendente",
-        status: { in: ["agendado", "concluido"] },
-      },
-      select: { id: true, valorTotal: true },
-    });
-    const total = pend.reduce((acc, a) => acc + Number(a.valorTotal), 0);
+    const metodo: ChargeMethod = ["pix", "cartao_credito", "cartao_debito", "dinheiro", "outro"].includes(b?.metodo)
+      ? (b.metodo as ChargeMethod)
+      : "dinheiro";
 
-    await prisma.$transaction([
-      prisma.appointment.updateMany({
-        where: { id: { in: pend.map((a) => a.id) } },
-        data: { statusPagamento: "pago" },
-      }),
-      prisma.subscription.update({
+    // Garante que existe uma cobrança (emite se necessário, reutiliza a aberta)
+    let charge = await prisma.subscriptionCharge.findFirst({
+      where: { mensalistaId: id, status: { in: ["pendente", "vencido"] } },
+      orderBy: { criadoEm: "desc" },
+    });
+    if (!charge) {
+      charge = await emitirCobranca(id, { manual: true });
+    }
+    if (!charge) {
+      // Ciclo em zero — apenas reinicia o ciclo sem cobrança
+      await prisma.subscription.update({
         where: { id },
         data: {
           totalCicloAtual: 0,
           dataUltimoPagamento: new Date(),
-          valorUltimoPagamento: total,
           proximaCobranca: proximaCobranca(sub.diaCobranca),
         },
-      }),
-      // Fecha cobranças abertas deste mensalista para não ficarem órfãs.
-      prisma.subscriptionCharge.updateMany({
-        where: { mensalistaId: id, status: { in: ["pendente", "vencido"] } },
-        data: { status: "pago", pagoEm: new Date(), metodo: "dinheiro" },
-      }),
-    ]);
-    return NextResponse.json({ ok: true, total });
+      });
+      return NextResponse.json({ ok: true, total: 0 });
+    }
+
+    const confirmada = await confirmarPagamento(charge.id, { manual: true, metodo });
+    return NextResponse.json({ ok: true, total: Number(confirmada.valor) });
   }
 
   const data: Record<string, unknown> = {};
@@ -64,6 +64,9 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (b?.diaCobranca === 10 || b?.diaCobranca === 30) {
     data.diaCobranca = b.diaCobranca;
     data.proximaCobranca = proximaCobranca(b.diaCobranca);
+  }
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
   }
   const atualizado = await prisma.subscription.update({ where: { id }, data });
   return NextResponse.json(atualizado);

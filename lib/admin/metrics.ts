@@ -25,6 +25,33 @@ function dec(v: { toString(): string } | null | undefined): number {
   return v ? parseFloat(v.toString()) : 0;
 }
 
+// ─── Cash-basis: cada receita conta uma vez, no pagamento ───────────────────
+// "servicos" = corte avulso. Cortes de mensalista contam no pagamento do ciclo
+// (mensalistas) e cortes consumidos de pacote contam na compra (assinaturas);
+// por isso são EXCLUÍDOS de servicos para não dobrar o total.
+
+// Agendamentos já consumidos por algum pacote (não entram em servicos).
+export async function idsAgendamentoPacote(): Promise<string[]> {
+  const usos = await prisma.clientPackageUsage.findMany({
+    where: { agendamentoId: { not: null } },
+    select: { agendamentoId: true },
+  });
+  return usos.map((u) => u.agendamentoId).filter((id): id is string => Boolean(id));
+}
+
+// Where de "serviço avulso": corte concluído na janela, de cliente NÃO mensalista
+// e não consumido por pacote.
+// ponytail: exclui pelo vínculo de mensalista atual do cliente — corte de
+// ex-mensalista inativo fica de fora; refinar por status se virar problema.
+function whereServicoAvulso(janela: { gte: Date; lt: Date }, idsPacote: string[]) {
+  return {
+    status: "concluido" as const,
+    data: janela,
+    cliente: { mensalidade: { is: null } },
+    ...(idsPacote.length ? { id: { notIn: idsPacote } } : {}),
+  };
+}
+
 // O campo Appointment.data é `@db.Date` → Prisma entrega meia-noite UTC. Para
 // filtrar/agrupar por dia do corte sem off-by-one de timezone, derivamos uma
 // janela UTC do mês (a partir do `desde` local que carrega ano/mês) e lemos a
@@ -96,9 +123,10 @@ export async function receitaPorFonte(
   ate: Date = new Date()
 ): Promise<ReceitaPorFonte> {
   const jd = janelaData(desde);
+  const idsPacote = await idsAgendamentoPacote();
   const [ags, pedidos, pacotes, subs] = await Promise.all([
     prisma.appointment.findMany({
-      where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
+      where: whereServicoAvulso({ gte: jd.desde, lt: jd.ate }, idsPacote),
       select: { valorTotal: true },
     }),
     prisma.order.findMany({
@@ -193,10 +221,17 @@ export async function resumoFinanceiro(
     Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   );
 
-  const [ags, pedidos, pacotes, subs] = await Promise.all([
+  const idsPacote = await idsAgendamentoPacote();
+  const [ags, avulso, pedidos, pacotes, subs] = await Promise.all([
     prisma.appointment.findMany({
       where: { data: { gte: desdeUTC, lt: ateUTC } },
-      select: { valorTotal: true, status: true },
+      select: { status: true },
+    }),
+    // Receita de serviço avulso (sem mensalista/pacote) — evita dupla contagem.
+    prisma.appointment.aggregate({
+      _sum: { valorTotal: true },
+      _count: { _all: true },
+      where: whereServicoAvulso({ gte: desdeUTC, lt: ateUTC }, idsPacote),
     }),
     prisma.order.findMany({
       where: { statusPagamento: "pago", criadoEm: { gte: desdeLocal } },
@@ -213,7 +248,8 @@ export async function resumoFinanceiro(
   ]);
 
   const concluidos = ags.filter((a) => a.status === "concluido");
-  const servicos = concluidos.reduce((s, a) => s + dec(a.valorTotal), 0);
+  const servicos = dec(avulso._sum.valorTotal);
+  const avulsoCount = avulso._count._all;
   const loja = pedidos.reduce((s, p) => s + dec(p.total), 0);
   const assinaturas = pacotes.reduce((s, p) => s + dec(p.pacote.preco), 0);
   const mensalistas = subs.reduce((s, x) => s + dec(x.valorUltimoPagamento), 0);
@@ -228,7 +264,7 @@ export async function resumoFinanceiro(
     atendimentos: concluidos.length,
     cancelados: ags.filter((a) => a.status === "cancelado").length,
     agendados: ags.filter((a) => a.status === "agendado").length,
-    ticket: concluidos.length ? servicos / concluidos.length : 0,
+    ticket: avulsoCount ? servicos / avulsoCount : 0,
   };
 }
 
@@ -247,9 +283,10 @@ export async function serieReceitaPorDia(
   ate: Date
 ): Promise<{ data: string; servicos: number; loja: number }[]> {
   const jd = janelaData(desde);
+  const idsPacote = await idsAgendamentoPacote();
   const [ags, pedidos] = await Promise.all([
     prisma.appointment.findMany({
-      where: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
+      where: whereServicoAvulso({ gte: jd.desde, lt: jd.ate }, idsPacote),
       select: { data: true, valorTotal: true },
     }),
     prisma.order.findMany({

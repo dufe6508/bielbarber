@@ -33,6 +33,8 @@ export type PreferenciaInput = {
   valor: number;
   descricao?: string;
   pagadorNome?: string;
+  // Sufixo base para back_urls (ex: "/mensalista", "/pacotes", "/loja"). Padrão: "/mensalista".
+  backUrlPath?: string;
 };
 
 export type PreferenciaResult = {
@@ -68,9 +70,9 @@ export async function criarPreferencia(
         external_reference: input.chargeId,
         notification_url: `${base}/api/pagamentos/mercadopago/webhook`,
         back_urls: {
-          success: `${base}/mensalista?pago=1`,
-          pending: `${base}/mensalista?pendente=1`,
-          failure: `${base}/mensalista?falhou=1`,
+          success: `${base}${input.backUrlPath ?? "/mensalista"}?pago=1`,
+          pending: `${base}${input.backUrlPath ?? "/mensalista"}?pendente=1`,
+          failure: `${base}${input.backUrlPath ?? "/mensalista"}?falhou=1`,
         },
         auto_return: "approved",
         statement_descriptor: "BIEL BARBER",

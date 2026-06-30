@@ -12,7 +12,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
 
-  const where: Prisma.SubscriptionChargeWhereInput = {};
+  // Painel de cobranças = mensalidade. Pacote/pedido/agendamento têm telas próprias.
+  const where: Prisma.SubscriptionChargeWhereInput = { tipo: "mensalista" };
   if (status && ["pendente", "pago", "vencido", "cancelado", "expirado"].includes(status)) {
     where.status = status as ChargeStatus;
   }

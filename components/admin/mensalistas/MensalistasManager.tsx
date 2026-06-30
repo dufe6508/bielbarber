@@ -121,11 +121,11 @@ export function MensalistasManager() {
     }
   }
 
-  async function _marcarPago(m: Mensalista) {
+  async function _marcarPago(m: Mensalista, metodo = "dinheiro") {
     const res = await fetch(`/api/admin/mensalistas/${m.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acao: "marcar_pago" }),
+      body: JSON.stringify({ acao: "marcar_pago", metodo }),
     });
     if (res.ok) {
       toast.success("Ciclo fechado e reiniciado.");

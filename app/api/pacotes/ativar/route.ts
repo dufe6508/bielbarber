@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { telefoneNumeros } from "@/lib/utils/format";
-import { ativarPacote } from "@/lib/packages";
+import { criarCobrancaPacote } from "@/lib/billing/charges";
 
-// POST — cliente ativa um pacote pelo site (pagamento no local).
-// Zero fricção: nome + telefone, sem senha. Cria/reaproveita o cliente.
+// POST — cliente inicia a compra de um pacote pelo site. Zero fricção: nome +
+// telefone, sem senha. Cria/reaproveita o cliente e emite uma cobrança pendente.
+// O pacote só é ativado depois que o pagamento confirma (cartão na hora; Pix via
+// webhook) — ver confirmarPagamento/confirmarPacote.
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body?.pacoteId || !body?.nome || !body?.telefone) {
@@ -32,18 +34,16 @@ export async function POST(request: Request) {
   });
   if (cliente.bloqueado) {
     return NextResponse.json(
-      { error: "Não foi possível ativar. Fale com a barbearia." },
+      { error: "Não foi possível continuar. Fale com a barbearia." },
       { status: 403 }
     );
   }
 
-  const cp = await ativarPacote(cliente.id, pacote.id);
+  const charge = await criarCobrancaPacote(cliente.id, pacote.id);
 
   return NextResponse.json({
-    ok: true,
+    chargeId: charge.id,
     pacote: pacote.nome,
-    usosTotais: cp.usosTotais,
-    usosRestantes: cp.usosRestantes,
-    expiraEm: cp.expiraEm,
+    valor: Number(charge.valor),
   });
 }

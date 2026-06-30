@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { janelaMes, janelaData } from "@/lib/admin/metrics";
+import { janelaMes, janelaData, idsAgendamentoPacote } from "@/lib/admin/metrics";
 
 type Item = { nome: string; sub?: string; valor?: number; qtd?: number };
 
@@ -49,9 +49,16 @@ export async function GET(request: Request) {
       .sort((a, b) => (b.valor ?? 0) - (a.valor ?? 0));
   } else if (tipo === "servicos") {
     titulo = "Serviços realizados";
+    // Só avulso (não mensalista, não consumido por pacote) — alinha com o total.
+    const idsPacote = await idsAgendamentoPacote();
     const linhas = await prisma.appointmentService.findMany({
       where: {
-        agendamento: { status: "concluido", data: { gte: jd.desde, lt: jd.ate } },
+        agendamento: {
+          status: "concluido",
+          data: { gte: jd.desde, lt: jd.ate },
+          cliente: { mensalidade: { is: null } },
+          ...(idsPacote.length ? { id: { notIn: idsPacote } } : {}),
+        },
       },
       select: { precoNaHora: true, servico: { select: { nome: true } } },
     });

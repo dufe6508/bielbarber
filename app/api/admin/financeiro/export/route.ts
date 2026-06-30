@@ -1,5 +1,6 @@
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { idsAgendamentoPacote } from "@/lib/admin/metrics";
 
 // GET ?de=YYYY-MM-DD&ate=YYYY-MM-DD → CSV com lançamentos do período:
 // agendamentos concluídos, pedidos pagos e pagamentos de mensalistas.
@@ -20,9 +21,16 @@ export async function GET(request: Request) {
   const fim = new Date(`${ate}T00:00:00.000Z`);
   fim.setUTCDate(fim.getUTCDate() + 1); // inclui o dia final inteiro
 
-  const [ags, pedidos, subs] = await Promise.all([
+  const idsPacote = await idsAgendamentoPacote();
+  const [ags, pedidos, pacotes, subs] = await Promise.all([
     prisma.appointment.findMany({
-      where: { status: "concluido", data: { gte: desde, lt: fim } },
+      // Só serviço avulso — mensalista/pacote entram nas próprias linhas.
+      where: {
+        status: "concluido",
+        data: { gte: desde, lt: fim },
+        cliente: { mensalidade: { is: null } },
+        ...(idsPacote.length ? { id: { notIn: idsPacote } } : {}),
+      },
       select: {
         data: true,
         valorTotal: true,
@@ -39,6 +47,14 @@ export async function GET(request: Request) {
         cliente: { select: { nome: true } },
       },
       orderBy: { criadoEm: "asc" },
+    }),
+    prisma.clientPackage.findMany({
+      where: { compradoEm: { gte: desde, lt: fim } },
+      select: {
+        compradoEm: true,
+        cliente: { select: { nome: true } },
+        pacote: { select: { nome: true, preco: true } },
+      },
     }),
     prisma.subscription.findMany({
       where: { dataUltimoPagamento: { gte: desde, lt: fim } },
@@ -69,6 +85,9 @@ export async function GET(request: Request) {
   }
   for (const p of pedidos) {
     linhas.push([dia(p.criadoEm), "Loja", p.cliente.nome, "Pedido", dec(p.total)]);
+  }
+  for (const a of pacotes) {
+    linhas.push([dia(a.compradoEm), "Assinatura", a.cliente.nome, a.pacote.nome, dec(a.pacote.preco)]);
   }
   for (const s of subs) {
     linhas.push([

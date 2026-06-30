@@ -14,6 +14,7 @@ import { StepHorario } from "./StepHorario";
 import { StepPagamento } from "./StepPagamento";
 import { StepIdentificacao } from "./StepIdentificacao";
 import { TicketConfirmacao } from "./TicketConfirmacao";
+import { PagamentoDrawer } from "@/components/PagamentoDrawer";
 
 const PASSOS = [
   { titulo: "Serviços", descricao: "O que você quer fazer" },
@@ -31,6 +32,7 @@ export function BookingStepper({ limite }: { limite: string }) {
   const [codigo, setCodigo] = useState<string | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const [cobrancaPendente, setCobrancaPendente] = useState(false);
+  const [pagamento, setPagamento] = useState<{ chargeId: string; valor: number } | null>(null);
   const { preselecionar } = booking;
 
   // Deep link: /?servico=<slug|id> → pré-seleciona o serviço e pula pro horário.
@@ -131,7 +133,13 @@ export function BookingStepper({ limite }: { limite: string }) {
       setCodigo(dados.codigo);
       // Push best-effort: pede permissão e registra a assinatura sem travar o fluxo.
       void ativarPush(telefoneNumeros(booking.telefone));
-      avancar();
+      // Pagamento online (pix/cartão): abre o checkout antes do ticket. Sem
+      // chargeId (local/mensalista) vai direto pro ticket.
+      if (dados.chargeId) {
+        setPagamento({ chargeId: dados.chargeId, valor: dados.valor });
+      } else {
+        avancar();
+      }
     } catch {
       toast.error("Erro de conexão. Verifique sua internet.");
     } finally {
@@ -441,6 +449,25 @@ export function BookingStepper({ limite }: { limite: string }) {
         )}
         {barraAcao}
       </div>
+
+      {/* Checkout online (pix/cartão) — ao fechar, segue pro ticket */}
+      {pagamento && (
+        <PagamentoDrawer
+          open
+          onOpenChange={(v) => {
+            if (!v) {
+              setPagamento(null);
+              avancar();
+            }
+          }}
+          total={pagamento.valor}
+          chargeId={pagamento.chargeId}
+          legenda="Agendamento · Biel Barber"
+          textoPixRodape="Assim que o Pix cair, seu horário fica confirmado."
+          tituloSucesso="Pagamento confirmado"
+          textoSucesso="Tudo certo! Seu horário está garantido."
+        />
+      )}
     </div>
   );
 }

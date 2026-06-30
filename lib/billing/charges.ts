@@ -2,6 +2,7 @@ import type { Prisma, ChargeMethod, SubscriptionCharge } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
 import { criarPreferencia } from "@/lib/mercadopago";
+import { ativarPacote } from "@/lib/packages";
 
 // ─── Motor de cobrança de mensalidade ───────────────────────────────────────
 // Centraliza emissão, confirmação, vencimento e cancelamento de cobranças.
@@ -113,12 +114,27 @@ export async function garantirPreferencia(chargeId: string): Promise<string | nu
   if (charge.mpInitPoint) return charge.mpInitPoint;
   if (Number(charge.valor) <= 0) return null;
 
+  const TITULO_POR_TIPO: Record<string, string> = {
+    mensalista: "Mensalidade — Biel Barber",
+    pacote: "Pacote — Biel Barber",
+    pedido: "Pedido Loja — Biel Barber",
+    agendamento: "Agendamento — Biel Barber",
+  };
+
+  const BACK_URL_POR_TIPO: Record<string, string> = {
+    mensalista: "/mensalista",
+    pacote: "/pacotes",
+    pedido: "/loja",
+    agendamento: "/meus-agendamentos",
+  };
+
   const pref = await criarPreferencia({
     chargeId: charge.id,
-    titulo: "Mensalidade — Biel Barber",
+    titulo: TITULO_POR_TIPO[charge.tipo] ?? "Pagamento — Biel Barber",
     valor: Number(charge.valor),
     descricao: charge.descricao ?? undefined,
     pagadorNome: charge.cliente.nome,
+    backUrlPath: BACK_URL_POR_TIPO[charge.tipo] ?? "/mensalista",
   });
   if (!pref) return null;
 
@@ -129,6 +145,91 @@ export async function garantirPreferencia(chargeId: string): Promise<string | nu
   return pref.initPoint;
 }
 
+// Cria uma cobrança avulsa para ativar um pacote (pago online, antes de ativar).
+// Idempotente: reaproveita cobrança pendente do mesmo pacote/cliente para não
+// gerar QRs duplicados se o cliente reabrir o checkout.
+export async function criarCobrancaPacote(
+  clienteId: string,
+  pacoteId: string
+): Promise<SubscriptionCharge> {
+  const pacote = await prisma.package.findFirstOrThrow({
+    where: { id: pacoteId, ativo: true },
+  });
+
+  const aberta = await prisma.subscriptionCharge.findFirst({
+    where: { clienteId, pacoteId, tipo: "pacote", status: "pendente" },
+    orderBy: { criadoEm: "desc" },
+  });
+  if (aberta) return aberta;
+
+  const charge = await prisma.subscriptionCharge.create({
+    data: {
+      tipo: "pacote",
+      clienteId,
+      pacoteId,
+      valor: pacote.preco,
+      descricao: pacote.nome,
+      vencimento: new Date(),
+      status: "pendente",
+    },
+  });
+
+  // Gera preferência MP automaticamente (silent fail se não configurado)
+  await garantirPreferencia(charge.id).catch(() => {});
+
+  return prisma.subscriptionCharge.findUnique({ where: { id: charge.id } }) as Promise<SubscriptionCharge>;
+}
+
+// Cria uma cobrança para um pedido da loja, vinculada ao pedido.
+export async function criarCobrancaPedido(
+  clienteId: string,
+  pedidoId: string,
+  valor: number,
+  descricao: string
+): Promise<SubscriptionCharge> {
+  const charge = await prisma.subscriptionCharge.create({
+    data: {
+      tipo: "pedido",
+      clienteId,
+      pedidoId,
+      valor,
+      descricao: descricao.slice(0, 200),
+      vencimento: new Date(),
+      status: "pendente",
+    },
+  });
+
+  // Gera preferência MP automaticamente
+  await garantirPreferencia(charge.id).catch(() => {});
+
+  return prisma.subscriptionCharge.findUnique({ where: { id: charge.id } }) as Promise<SubscriptionCharge>;
+}
+
+// Cria uma cobrança para um agendamento avulso (pago online), vinculada a ele.
+export async function criarCobrancaAgendamento(
+  clienteId: string,
+  agendamentoId: string,
+  valor: number,
+  descricao: string
+): Promise<SubscriptionCharge> {
+  const charge = await prisma.subscriptionCharge.create({
+    data: {
+      tipo: "agendamento",
+      clienteId,
+      agendamentoId,
+      valor,
+      descricao: descricao.slice(0, 200),
+      vencimento: new Date(),
+      status: "pendente",
+    },
+  });
+
+  await garantirPreferencia(charge.id).catch(() => {});
+
+  return prisma.subscriptionCharge.findUnique({ where: { id: charge.id } }) as Promise<SubscriptionCharge>;
+}
+
+
 export type ConfirmarOpts = {
   metodo?: ChargeMethod;
   mpPaymentId?: string;
@@ -137,7 +238,8 @@ export type ConfirmarOpts = {
 };
 
 // Confirma o pagamento de uma cobrança. Idempotente (já paga → no-op).
-// Quita os atendimentos do snapshot, reinicia o ciclo do mensalista e mantém o
+// Mensalista: quita os atendimentos do snapshot e reinicia o ciclo. Pacote:
+// ativa o pacote do cliente (só após o pagamento confirmar). Mantém o
 // financeiro consistente (mesmo efeito da antiga ação "marcar_pago").
 export async function confirmarPagamento(
   chargeId: string,
@@ -149,8 +251,13 @@ export async function confirmarPagamento(
   if (!charge) throw new Error("Cobrança não encontrada");
   if (charge.status === "pago") return charge;
 
+  if (charge.tipo === "pacote") return confirmarPacote(charge, opts);
+  if (charge.tipo === "pedido") return confirmarPedidoCharge(charge, opts);
+  if (charge.tipo === "agendamento") return confirmarAgendamentoCharge(charge, opts);
+
+  // mensalista (default)
   const sub = await prisma.subscription.findUnique({
-    where: { id: charge.mensalistaId },
+    where: { id: charge.mensalistaId ?? "" },
   });
   if (!sub) throw new Error("Mensalista não encontrado");
 
@@ -195,6 +302,88 @@ export async function confirmarPagamento(
   return atualizado;
 }
 
+// Confirma uma cobrança de pacote: ativa o pacote do cliente (idempotente — não
+// reativa se já houver ClientPackage vinculado) e marca a cobrança como paga.
+async function confirmarPacote(
+  charge: SubscriptionCharge,
+  opts: ConfirmarOpts
+): Promise<SubscriptionCharge> {
+  if (!charge.pacoteId) throw new Error("Cobrança de pacote sem pacote");
+  const metodo: ChargeMethod = opts.metodo ?? (opts.manual ? "dinheiro" : "outro");
+
+  const cp = charge.clientePacoteId
+    ? null
+    : await ativarPacote(charge.clienteId, charge.pacoteId);
+
+  return prisma.subscriptionCharge.update({
+    where: { id: charge.id },
+    data: {
+      status: "pago",
+      pagoEm: new Date(),
+      metodo,
+      mpPaymentId: opts.mpPaymentId ?? charge.mpPaymentId,
+      comprovanteUrl: opts.comprovanteUrl ?? charge.comprovanteUrl,
+      clientePacoteId: cp?.id ?? charge.clientePacoteId,
+    },
+  });
+}
+
+// Confirma uma cobrança de pedido da loja: marca o Order como pago.
+async function confirmarPedidoCharge(
+  charge: SubscriptionCharge,
+  opts: ConfirmarOpts
+): Promise<SubscriptionCharge> {
+  const metodo: ChargeMethod = opts.metodo ?? (opts.manual ? "dinheiro" : "outro");
+  return prisma.$transaction(async (tx) => {
+    // Baixa o pedido vinculado à cobrança (estoque já foi descontado na criação).
+    if (charge.pedidoId) {
+      await tx.order.updateMany({
+        where: { id: charge.pedidoId, statusPagamento: "pendente" },
+        data: {
+          statusPagamento: "pago",
+          formaPagamento: metodo === "pix" ? "pix" : metodo.startsWith("cartao") ? "cartao" : "local",
+        },
+      });
+    }
+    return tx.subscriptionCharge.update({
+      where: { id: charge.id },
+      data: {
+        status: "pago",
+        pagoEm: new Date(),
+        metodo,
+        mpPaymentId: opts.mpPaymentId ?? charge.mpPaymentId,
+        comprovanteUrl: opts.comprovanteUrl ?? charge.comprovanteUrl,
+      },
+    });
+  });
+}
+
+// Confirma uma cobrança de agendamento avulso: baixa o agendamento vinculado.
+async function confirmarAgendamentoCharge(
+  charge: SubscriptionCharge,
+  opts: ConfirmarOpts
+): Promise<SubscriptionCharge> {
+  const metodo: ChargeMethod = opts.metodo ?? (opts.manual ? "dinheiro" : "outro");
+  return prisma.$transaction(async (tx) => {
+    if (charge.agendamentoId) {
+      await tx.appointment.updateMany({
+        where: { id: charge.agendamentoId, statusPagamento: "pendente" },
+        data: { statusPagamento: "pago" },
+      });
+    }
+    return tx.subscriptionCharge.update({
+      where: { id: charge.id },
+      data: {
+        status: "pago",
+        pagoEm: new Date(),
+        metodo,
+        mpPaymentId: opts.mpPaymentId ?? charge.mpPaymentId,
+        comprovanteUrl: opts.comprovanteUrl ?? charge.comprovanteUrl,
+      },
+    });
+  });
+}
+
 // Cancela uma cobrança aberta (não paga).
 export async function cancelarCobranca(chargeId: string): Promise<SubscriptionCharge> {
   const charge = await prisma.subscriptionCharge.findUnique({ where: { id: chargeId } });
@@ -232,9 +421,10 @@ export async function processarVencimentos(): Promise<{
   const hoje = new Date();
   const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
 
-  // 1) pendentes vencidas → vencido
+  // 1) pendentes vencidas → vencido (só mensalidade: pedido/pacote/agendamento
+  // são cobranças avulsas pagas na hora, não entram no fluxo de dunning).
   const aVencer = await prisma.subscriptionCharge.findMany({
-    where: { status: "pendente", vencimento: { lt: inicioHoje } },
+    where: { tipo: "mensalista", status: "pendente", vencimento: { lt: inicioHoje } },
   });
   for (const c of aVencer) {
     await prisma.subscriptionCharge.update({
@@ -253,6 +443,7 @@ export async function processarVencimentos(): Promise<{
   const limite = new Date(hoje.getTime() - 3 * 24 * 60 * 60 * 1000);
   const reincidentes = await prisma.subscriptionCharge.findMany({
     where: {
+      tipo: "mensalista",
       status: "vencido",
       id: { notIn: aVencer.map((c) => c.id) },
       OR: [{ ultimoLembrete: null }, { ultimoLembrete: { lt: limite } }],
