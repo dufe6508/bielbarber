@@ -177,15 +177,17 @@ export function MensalistasManager() {
     }
   }
 
-  // Busca clientes existentes para o modal de seleção
+  // Busca clientes existentes para o modal de seleção (debounce)
   useEffect(() => {
-    if (!modalClientes || buscaCliente.trim().length < 2) {
-      setClientesResultado([]);
-      return;
-    }
+    if (!modalClientes) return;
+    const termo = buscaCliente.trim();
     const t = setTimeout(async () => {
+      if (termo.length < 2) {
+        setClientesResultado([]);
+        return;
+      }
       try {
-        const res = await fetch(`/api/admin/clientes?busca=${encodeURIComponent(buscaCliente.trim())}`);
+        const res = await fetch(`/api/admin/clientes?busca=${encodeURIComponent(termo)}`);
         const dados = await res.json();
         const telefonesExistentes = new Set(lista.map((m) => m.telefone));
         setClientesResultado(
