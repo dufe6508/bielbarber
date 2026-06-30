@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   QrCode,
   CreditCard,
+  AlertCircle,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatarPreco, formatarData } from "@/lib/utils/format";
@@ -58,24 +60,36 @@ export function PagamentoDrawer({
   const [etapa, setEtapa] = useState<Etapa>("form");
   const [pix, setPix] = useState<Pix | null>(null);
   const [brickPronto, setBrickPronto] = useState(false);
-  // Mostra o fallback (Checkout Pro) se o Brick não carregar — comum quando
-  // sdk.mercadopago.com está bloqueado (adblock/extensão/rede).
   const [mostrarFallback, setMostrarFallback] = useState(false);
   const [redirecionando, setRedirecionando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
 
-  // Se o Brick não ficar pronto em 5s, oferece o checkout externo.
+  // Fallback após 8s se o brick não carregar (ex: adblocker)
   useEffect(() => {
     if (!open || etapa !== "form" || brickPronto) return;
-    const t = setTimeout(() => setMostrarFallback(true), 5000);
+    const t = setTimeout(() => setMostrarFallback(true), 8000);
     return () => clearTimeout(t);
   }, [open, etapa, brickPronto]);
 
+  // Bloquear scroll do body quando modal aberto
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   function fechar() {
     onOpenChange(false);
-    setEtapa("form");
-    setPix(null);
-    setBrickPronto(false);
-    setMostrarFallback(false);
+    // Reset com delay para não piscar durante a animação de saída
+    setTimeout(() => {
+      setEtapa("form");
+      setPix(null);
+      setBrickPronto(false);
+      setMostrarFallback(false);
+    }, 300);
   }
 
   function handleResult(r: ResultadoPagamento) {
@@ -87,14 +101,21 @@ export function PagamentoDrawer({
     if (r.tipo === "aprovado") {
       setEtapa("sucesso");
       onPago?.();
-      setTimeout(fechar, 2600);
+      setTimeout(fechar, 2800);
       return;
     }
     setEtapa("pendente");
     onPago?.();
   }
 
-  // Fallback: abre o Checkout Pro hospedado no Mercado Pago (não usa o SDK JS).
+  async function copiarPix() {
+    if (!pix) return;
+    await navigator.clipboard?.writeText(pix.qrCode);
+    setCopiado(true);
+    toast.success("Código Pix copiado!");
+    setTimeout(() => setCopiado(false), 2500);
+  }
+
   async function abrirCheckoutExterno() {
     if (!chargeId) return;
     setRedirecionando(true);
@@ -120,212 +141,320 @@ export function PagamentoDrawer({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-[70] flex flex-col bg-background"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {/* Topo */}
-          <header className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
-              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                Pagamento seguro · {barbearia}
-              </span>
-            </div>
-            <button
-              onClick={fechar}
-              aria-label="Fechar"
-              className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        <>
+          {/* Backdrop */}
+          <motion.div
+            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            onClick={fechar}
+          />
+
+          {/* Modal */}
+          <motion.div
+            className="fixed inset-0 z-[61] flex items-end justify-center sm:items-center sm:p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="relative flex w-full flex-col overflow-hidden rounded-t-3xl bg-background shadow-2xl sm:max-w-md sm:rounded-3xl"
+              style={{ maxHeight: "calc(100dvh - 40px)" }}
+              initial={{ y: 60, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 40, opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
             >
-              <X className="size-5" />
-            </button>
-          </header>
+              {/* Drag handle (mobile) */}
+              <div className="flex justify-center pt-3 pb-1 sm:hidden">
+                <div className="h-1 w-10 rounded-full bg-border" />
+              </div>
 
-          <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-5 py-6">
-            <AnimatePresence mode="wait">
-              {etapa === "form" && (
-                <Passo key="form">
-                  <ValorGrande
-                    total={total}
-                    legenda={legenda ?? (chargeId ? `Pagamento · ${barbearia}` : "Total a pagar")}
-                  />
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-primary/10">
+                    <ShieldCheck className="size-3.5 text-primary" aria-hidden="true" />
+                  </span>
+                  <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Pagamento Seguro · {barbearia}
+                  </span>
+                </div>
+                <button
+                  onClick={fechar}
+                  aria-label="Fechar"
+                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
 
-                  {(vencimento || descricao) && (
-                    <div className="mt-5 space-y-2 rounded-xl border border-border bg-card p-4 text-sm">
-                      {descricao && (
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-muted-foreground">Referente a</span>
-                          <span className="text-right font-medium text-foreground">{descricao}</span>
-                        </div>
-                      )}
-                      {vencimento && (
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                            <CalendarClock className="size-3.5" /> Vencimento
-                          </span>
-                          <span className="font-mono tabular-nums text-foreground">
-                            {formatarData(vencimento)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+              {/* Conteúdo com scroll */}
+              <div className="flex-1 overflow-y-auto">
+                <AnimatePresence mode="wait">
 
-                  {/* Métodos aceitos */}
-                  <div className="mt-5 flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <QrCode className="size-4" /> Pix
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <CreditCard className="size-4" /> Cartão
-                    </span>
-                  </div>
+                  {/* ── Etapa: formulário de pagamento ── */}
+                  {etapa === "form" && (
+                    <Passo key="form">
+                      {/* Valor em destaque */}
+                      <div className="px-5 pb-5 pt-6">
+                        <ValorDestaque
+                          total={total}
+                          legenda={legenda ?? (descricao ?? `Pagamento · ${barbearia}`)}
+                        />
 
-                  <div className="mt-4">
-                    {chargeId ? (
-                      <MpPaymentBrick
-                        amount={total}
-                        chargeId={chargeId}
-                        onReadyChange={setBrickPronto}
-                        onResult={handleResult}
-                        onErro={(msg) => {
-                          if (msg) toast.error(msg);
-                          setMostrarFallback(true);
-                        }}
-                      />
-                    ) : (
-                      <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
-                        Cobrança não encontrada.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Fallback: Checkout Pro hospedado (quando o SDK não carrega) */}
-                  {mostrarFallback && chargeId && (
-                    <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/30 p-4">
-                      <p className="text-xs text-muted-foreground">
-                        Formulário demorando ou bloqueado? Pague na página segura do
-                        Mercado Pago.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={abrirCheckoutExterno}
-                        disabled={redirecionando}
-                        className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
-                      >
-                        {redirecionando ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <>
-                            Pagar no Mercado Pago <ExternalLink className="size-4" />
-                          </>
+                        {/* Info da cobrança */}
+                        {(vencimento || descricao) && (
+                          <div className="mt-4 space-y-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm">
+                            {descricao && (
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">Referente a</span>
+                                <span className="text-right font-medium text-foreground">{descricao}</span>
+                              </div>
+                            )}
+                            {vencimento && (
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                                  <CalendarClock className="size-3.5" /> Vencimento
+                                </span>
+                                <span className="font-mono tabular-nums text-foreground">
+                                  {formatarData(vencimento)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         )}
-                      </button>
-                    </div>
-                  )}
-                </Passo>
-              )}
 
-              {etapa === "pix" && pix && (
-                <Passo key="pix">
-                  <ValorGrande total={total} legenda="Pague via Pix" />
-                  <div className="mt-6 flex flex-col items-center">
-                    {pix.qrCodeBase64 ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`data:image/png;base64,${pix.qrCodeBase64}`}
-                        alt="QR Code Pix"
-                        className="size-60 rounded-2xl border border-border bg-white p-2"
-                      />
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(pix.qrCode);
-                        toast.success("Código Pix copiado");
-                      }}
-                      className="mt-5 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
-                    >
-                      <Copy className="size-4" />
-                      Copiar código Pix
-                    </button>
-                    {pix.ticketUrl && (
-                      <a
-                        href={pix.ticketUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                      >
-                        Abrir no app do banco <ExternalLink className="size-3" />
-                      </a>
-                    )}
-                    <p className="mt-5 text-center text-xs text-muted-foreground">
-                      {textoPixRodape}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={fechar}
-                    className="mt-7 h-12 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
-                  >
-                    Já paguei
-                  </button>
-                </Passo>
-              )}
-
-              {etapa === "pendente" && (
-                <Passo key="pendente">
-                  <div className="flex flex-col items-center gap-4 py-16 text-center">
-                    <span className="flex size-16 items-center justify-center rounded-full bg-amber-500/12 text-amber-600 dark:text-amber-400">
-                      <Clock3 className="size-8" />
-                    </span>
-                    <div>
-                      <p className="font-heading text-xl font-semibold tracking-tight text-foreground">
-                        Pagamento em análise
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Você será avisado assim que for confirmado.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={fechar}
-                      className="mt-2 h-11 rounded-xl border border-border bg-card px-6 text-sm font-medium text-foreground"
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                </Passo>
-              )}
-
-              {etapa === "sucesso" && (
-                <Passo key="sucesso">
-                  <div className="flex flex-col items-center gap-4 py-16 text-center">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 16 }}
-                      className="flex size-20 items-center justify-center rounded-full bg-primary/10"
-                    >
-                      <div className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Check className="size-8" strokeWidth={3} />
+                        {/* Métodos aceitos */}
+                        <div className="mt-4 flex items-center gap-4">
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+                            <QrCode className="size-3.5" /> Pix
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+                            <CreditCard className="size-3.5" /> Cartão
+                          </span>
+                        </div>
                       </div>
-                    </motion.div>
-                    <div>
-                      <p className="font-heading text-xl font-semibold tracking-tight text-foreground">
-                        {tituloSucesso}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">{textoSucesso}</p>
-                    </div>
-                  </div>
-                </Passo>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
+
+                      {/* Brick MP */}
+                      <div className="px-5 pb-6">
+                        {chargeId ? (
+                          <div className="relative min-h-[200px]">
+                            {/* Loading state enquanto o SDK inicializa */}
+                            {!brickPronto && !mostrarFallback && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30">
+                                <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
+                                  <Loader2 className="size-5 animate-spin text-primary" />
+                                </div>
+                                <p className="text-sm text-muted-foreground">Carregando formulário…</p>
+                              </div>
+                            )}
+                            <MpPaymentBrick
+                              amount={total}
+                              chargeId={chargeId}
+                              onReadyChange={setBrickPronto}
+                              onResult={handleResult}
+                              onErro={(msg) => {
+                                if (msg) toast.error(msg);
+                                setMostrarFallback(true);
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+                            <AlertCircle className="size-4 shrink-0 text-destructive" />
+                            Cobrança não encontrada.
+                          </div>
+                        )}
+
+                        {/* Fallback: Checkout Pro externo */}
+                        {mostrarFallback && chargeId && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4"
+                          >
+                            <div className="flex items-start gap-3">
+                              <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground">
+                                  Formulário bloqueado
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  Pode ser um bloqueador de anúncios. Pague com segurança pelo site do Mercado Pago.
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={abrirCheckoutExterno}
+                              disabled={redirecionando}
+                              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                            >
+                              {redirecionando ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <>
+                                  Pagar no Mercado Pago <ExternalLink className="size-3.5" />
+                                </>
+                              )}
+                            </button>
+                          </motion.div>
+                        )}
+                      </div>
+                    </Passo>
+                  )}
+
+                  {/* ── Etapa: QR Code Pix ── */}
+                  {etapa === "pix" && pix && (
+                    <Passo key="pix">
+                      <div className="flex flex-col items-center px-5 pb-8 pt-6">
+                        {/* Ícone Pix */}
+                        <div className="flex size-14 items-center justify-center rounded-2xl bg-[#00B37E]/10">
+                          <Smartphone className="size-7 text-[#00B37E]" />
+                        </div>
+                        <h2 className="mt-3 text-base font-semibold text-foreground">Pague via Pix</h2>
+                        <p className="mt-1 text-center text-sm text-muted-foreground">
+                          Escaneie o QR Code ou copie o código abaixo
+                        </p>
+
+                        {/* Valor */}
+                        <div className="mt-4 rounded-xl bg-muted/50 px-5 py-2">
+                          <span className="font-mono text-xl font-bold tabular-nums text-foreground">
+                            {formatarPreco(total)}
+                          </span>
+                        </div>
+
+                        {/* QR Code */}
+                        {pix.qrCodeBase64 ? (
+                          <div className="mt-5 rounded-2xl border-2 border-border bg-white p-3 shadow-md">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`data:image/png;base64,${pix.qrCodeBase64}`}
+                              alt="QR Code Pix"
+                              className="size-52"
+                            />
+                          </div>
+                        ) : null}
+
+                        {/* Botão copiar */}
+                        <button
+                          type="button"
+                          onClick={copiarPix}
+                          className="mt-4 inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-muted active:scale-[0.98]"
+                        >
+                          <AnimatePresence mode="wait">
+                            {copiado ? (
+                              <motion.span
+                                key="check"
+                                initial={{ scale: 0.7, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.7, opacity: 0 }}
+                                className="flex items-center gap-2 text-[#00B37E]"
+                              >
+                                <Check className="size-4" /> Copiado!
+                              </motion.span>
+                            ) : (
+                              <motion.span
+                                key="copy"
+                                initial={{ scale: 0.7, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.7, opacity: 0 }}
+                                className="flex items-center gap-2"
+                              >
+                                <Copy className="size-4" /> Copiar código Pix
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                        </button>
+
+                        {pix.ticketUrl && (
+                          <a
+                            href={pix.ticketUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                          >
+                            Abrir no app do banco <ExternalLink className="size-3" />
+                          </a>
+                        )}
+
+                        <p className="mt-5 max-w-[280px] text-center text-xs text-muted-foreground">
+                          {textoPixRodape}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={fechar}
+                          className="mt-5 h-11 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98]"
+                        >
+                          Já paguei
+                        </button>
+                      </div>
+                    </Passo>
+                  )}
+
+                  {/* ── Etapa: Em análise ── */}
+                  {etapa === "pendente" && (
+                    <Passo key="pendente">
+                      <div className="flex flex-col items-center gap-4 px-5 py-12 text-center">
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 280, damping: 18 }}
+                          className="flex size-20 items-center justify-center rounded-full bg-amber-500/10"
+                        >
+                          <div className="flex size-14 items-center justify-center rounded-full bg-amber-500/20">
+                            <Clock3 className="size-8 text-amber-500" />
+                          </div>
+                        </motion.div>
+                        <div>
+                          <p className="text-lg font-semibold text-foreground">Pagamento em análise</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Você será avisado assim que for confirmado.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={fechar}
+                          className="mt-2 h-10 rounded-xl border border-border bg-card px-8 text-sm font-medium text-foreground transition-all hover:bg-muted"
+                        >
+                          Fechar
+                        </button>
+                      </div>
+                    </Passo>
+                  )}
+
+                  {/* ── Etapa: Sucesso ── */}
+                  {etapa === "sucesso" && (
+                    <Passo key="sucesso">
+                      <div className="flex flex-col items-center gap-4 px-5 py-12 text-center">
+                        <motion.div
+                          initial={{ scale: 0, rotate: -10 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: "spring", stiffness: 300, damping: 16 }}
+                        >
+                          <div className="flex size-20 items-center justify-center rounded-full bg-primary/10">
+                            <div className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                              <Check className="size-8" strokeWidth={3} />
+                            </div>
+                          </div>
+                        </motion.div>
+                        <div>
+                          <p className="text-lg font-semibold text-foreground">{tituloSucesso}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{textoSucesso}</p>
+                        </div>
+                      </div>
+                    </Passo>
+                  )}
+
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
@@ -334,23 +463,21 @@ export function PagamentoDrawer({
 function Passo({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: 14 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -14 }}
-      transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
     >
       {children}
     </motion.div>
   );
 }
 
-function ValorGrande({ total, legenda }: { total: number; legenda: string }) {
+function ValorDestaque({ total, legenda }: { total: number; legenda: string }) {
   return (
     <div className="text-center">
-      <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-        {legenda}
-      </p>
-      <p className="mt-1 font-mono text-4xl font-bold tabular-nums text-foreground">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{legenda}</p>
+      <p className="mt-1.5 font-mono text-4xl font-bold tabular-nums text-foreground">
         {formatarPreco(total)}
       </p>
     </div>

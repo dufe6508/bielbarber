@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
-import { Loader2 } from "lucide-react";
 
 // Wrapper do Payment Brick do Mercado Pago. Carregado só no cliente (via dynamic
 // import com ssr:false no drawer) — o SDK depende de `window`. Tokeniza o cartão
@@ -30,93 +29,99 @@ export function MpPaymentBrick({
   onErro: (msg?: string) => void;
   onReadyChange?: (pronto: boolean) => void;
 }) {
-  const [pronto, setPronto] = useState(false);
+  // Refs para callbacks — assim as funções passadas ao <Payment> têm
+  // referência ESTÁVEL entre renders e o Brick não se reinicializa.
+  const onResultRef = useRef(onResult);
+  const onErroRef = useRef(onErro);
+  const onReadyRef = useRef(onReadyChange);
+  onResultRef.current = onResult;
+  onErroRef.current = onErro;
+  onReadyRef.current = onReadyChange;
 
   useEffect(() => {
-    if (PUB && !inited) {
+    if (!PUB) {
+      onErroRef.current?.("Pagamento no app indisponível");
+      return;
+    }
+    if (!inited) {
       initMercadoPago(PUB, { locale: "pt-BR" });
       inited = true;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sem chave pública → sinaliza erro pra UI cair no fallback (Checkout Pro).
-  useEffect(() => {
-    if (!PUB) onErro("Pagamento no app indisponível");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Callbacks com deps vazias — referência estável para o SDK do MP não
+  // destruir e recriar o Brick a cada re-render do componente pai.
+  const handleReady = useCallback(() => {
+    onReadyRef.current?.(true);
   }, []);
+
+  const handleError = useCallback((e: { message?: string }) => {
+    onErroRef.current?.(e?.message);
+  }, []);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleSubmit = useCallback(async ({ formData }: { formData: any }) => {
+    const res = await fetch("/api/pagamentos/mercadopago/processar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chargeId, formData }),
+    });
+    const d = await res.json().catch(() => null);
+    if (!res.ok) {
+      onErroRef.current?.(d?.error);
+      throw new Error(d?.error ?? "Falha no pagamento");
+    }
+    if (d?.pix) {
+      onResultRef.current({
+        tipo: "pix",
+        qrCode: d.pix.qrCode,
+        qrCodeBase64: d.pix.qrCodeBase64,
+        ticketUrl: d.pix.ticketUrl,
+      });
+      return;
+    }
+    if (d?.status === "approved") {
+      onResultRef.current({ tipo: "aprovado" });
+      return;
+    }
+    if (d?.status === "in_process" || d?.status === "pending") {
+      onResultRef.current({ tipo: "pendente" });
+      return;
+    }
+    // Rejeitado — deixa o Brick exibir o erro e permitir nova tentativa.
+    throw new Error("Pagamento recusado. Tente outro cartão.");
+  // chargeId é parte da URL — OK como dep estável (não muda durante a sessão)
+  }, [chargeId]);
 
   if (!PUB) {
-    return (
-      <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
-        Carregando opções de pagamento…
-      </p>
-    );
+    return null; // O PagamentoDrawer já lida com o fallback
   }
 
   return (
-    <div className="relative min-h-[180px]">
-      {!pronto && (
-        <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Carregando pagamento…
-        </div>
-      )}
-      <Payment
-        initialization={{ amount }}
-        customization={{
-          paymentMethods: {
-            creditCard: "all",
-            debitCard: "all",
-            bankTransfer: ["pix"],
-          },
-          visual: {
-            style: {
-              customVariables: {
-                baseColor: "#1c1d20",
-                textPrimaryColor: "#18191b",
-                textSecondaryColor: "#6b6d72",
-                borderRadiusMedium: "12px",
-                borderRadiusLarge: "16px",
-              },
+    <Payment
+      initialization={{ amount }}
+      customization={{
+        paymentMethods: {
+          creditCard: "all",
+          debitCard: "all",
+          bankTransfer: ["pix"],
+        },
+        visual: {
+          style: {
+            customVariables: {
+              baseColor: "#1c1d20",
+              textPrimaryColor: "#18191b",
+              textSecondaryColor: "#6b6d72",
+              borderRadiusMedium: "12px",
+              borderRadiusLarge: "16px",
             },
           },
-        }}
-        onReady={() => {
-          setPronto(true);
-          onReadyChange?.(true);
-        }}
-        onError={(e) => onErro(e?.message)}
-        onSubmit={async ({ formData }) => {
-          const res = await fetch("/api/pagamentos/mercadopago/processar", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chargeId, formData }),
-          });
-          const d = await res.json().catch(() => null);
-          if (!res.ok) {
-            onErro(d?.error);
-            throw new Error(d?.error ?? "Falha no pagamento");
-          }
-          if (d?.pix) {
-            onResult({
-              tipo: "pix",
-              qrCode: d.pix.qrCode,
-              qrCodeBase64: d.pix.qrCodeBase64,
-              ticketUrl: d.pix.ticketUrl,
-            });
-            return;
-          }
-          if (d?.status === "approved") {
-            onResult({ tipo: "aprovado" });
-            return;
-          }
-          if (d?.status === "in_process" || d?.status === "pending") {
-            onResult({ tipo: "pendente" });
-            return;
-          }
-          // rejeitado — deixa o Brick exibir o erro e permitir nova tentativa.
-          throw new Error("Pagamento recusado. Tente outro cartão.");
-        }}
-      />
-    </div>
+        },
+      }}
+      onReady={handleReady}
+      onError={handleError}
+      onSubmit={handleSubmit}
+    />
   );
 }
