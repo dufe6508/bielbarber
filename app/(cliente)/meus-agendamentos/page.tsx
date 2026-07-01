@@ -291,58 +291,58 @@ function CartaoAgendamento({
       {/* Faixa lateral de status */}
       <span className={cn("absolute inset-y-0 left-0 w-1", v.faixa)} />
 
-      <div className="p-4 pl-5">
+      <div className="p-3.5 pl-4">
         {/* Linha 1: data + badge */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span
               className={cn(
-                "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                "flex size-9 shrink-0 items-center justify-center rounded-xl",
                 v.ativo
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground"
               )}
             >
-              <Scissors className="size-4" />
+              <Scissors className="size-[17px]" />
             </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-heading text-base font-semibold tracking-tight text-foreground">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="font-heading text-[15px] font-semibold leading-tight tracking-tight text-foreground">
                   {capitalizar(formatarDataExtenso(a.data).replace(/\./g, ""))}
                 </p>
                 {relevante(a.data) && (
-                  <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
+                  <span className="rounded-full bg-foreground px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-background">
                     {rotuloRelativo(a.data)}
                   </span>
                 )}
               </div>
-              <p className="flex items-center gap-1 font-mono text-sm tabular-nums text-muted-foreground">
+              <p className="mt-0.5 flex items-center gap-1 font-mono text-[13px] tabular-nums text-muted-foreground">
                 <Clock className="size-3" aria-hidden="true" />
                 {a.horarioInicio}
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex shrink-0 flex-col items-end gap-1">
             <span
               className={cn(
-                "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                "rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold",
                 v.badge
               )}
             >
               {v.rotulo}
             </span>
-            <span className="font-mono text-base font-bold tabular-nums text-foreground">
+            <span className="font-mono text-[15px] font-bold tabular-nums text-foreground">
               {formatarPreco(a.valorTotal)}
             </span>
           </div>
         </div>
 
-        {/* Serviços */}
+        {/* Serviços — pills discretas */}
         <div className="mt-3 flex flex-wrap gap-1.5 border-t border-dashed border-border pt-3">
           {a.servicos.map((s) => (
             <span
               key={s.nome}
-              className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+              className="rounded-full border border-border/60 bg-muted/40 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
             >
               {s.nome}
             </span>

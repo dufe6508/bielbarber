@@ -230,49 +230,47 @@ export default function MensalistaPage() {
             </span>
           </div>
 
-          {/* Cobrança em aberto — CTA principal de pagamento */}
+          {/* Cobrança em aberto — CTA principal de pagamento (compacto) */}
           {cobranca?.aberta && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className={cn(
-                "mt-6 overflow-hidden rounded-2xl border p-5 shadow-md",
+                "mt-6 overflow-hidden rounded-2xl border p-4 shadow-sm",
                 cobranca.aberta.status === "vencido"
                   ? "border-amber-500/40 bg-amber-500/[0.07] dark:border-amber-400/30 dark:bg-amber-400/[0.08]"
                   : "border-border bg-card"
               )}
             >
-              <div className="flex items-center gap-2">
-                <span className="inline-flex size-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              {/* Título + valor na mesma linha — economiza altura */}
+              <div className="flex items-center gap-3">
+                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
                   {cobranca.aberta.status === "vencido" ? (
                     <AlertTriangle className="size-5" />
                   ) : (
                     <Wallet className="size-5" />
                   )}
                 </span>
-                <div>
-                  <p className="font-heading text-base font-semibold text-foreground">
+                <div className="min-w-0 flex-1">
+                  <p className="font-heading text-sm font-semibold text-foreground">
                     {cobranca.aberta.status === "vencido"
                       ? "Mensalidade vencida"
                       : "Mensalidade pendente"}
                   </p>
                   {cobranca.aberta.vencimento && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       Vence {formatarData(cobranca.aberta.vencimento)}
                     </p>
                   )}
                 </div>
-              </div>
-              <div className="mt-4 flex items-baseline justify-between">
-                <span className="text-sm text-muted-foreground">Valor</span>
-                <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                <span className="shrink-0 font-mono text-xl font-bold tabular-nums text-foreground">
                   {formatarPreco(cobranca.aberta.valor)}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setPagar(true)}
-                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
+                className="mt-3.5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
               >
                 <Wallet className="size-4" />
                 Efetuar pagamento
@@ -293,7 +291,7 @@ export default function MensalistaPage() {
                 initial="hidden"
                 animate="show"
                 variants={{ show: { transition: { staggerChildren: 0.05 } } }}
-                className="mt-5 space-y-3"
+                className="mt-5 space-y-2"
               >
                 {r.agendamentos.map((c) => (
                   <motion.li
@@ -304,20 +302,20 @@ export default function MensalistaPage() {
                     }}
                     whileHover={{ y: -2 }}
                     transition={{ type: "spring", stiffness: 320, damping: 26 }}
-                    className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-primary/[0.05]"
+                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xs transition-shadow duration-300 hover:shadow-sm"
                   >
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                      <Scissors className="size-5" />
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Scissors className="size-[18px]" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-foreground">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {c.servicos.map((s) => s.nome).join(", ")}
                       </p>
-                      <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                      <p className="font-mono text-[11px] tabular-nums text-muted-foreground">
                         {formatarData(c.data)} · {c.horarioInicio}
                       </p>
                     </div>
-                    <span className="font-mono text-base font-semibold tabular-nums text-foreground">
+                    <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">
                       {formatarPreco(c.valorTotal)}
                     </span>
                   </motion.li>
@@ -325,7 +323,7 @@ export default function MensalistaPage() {
               </motion.ul>
 
               {/* Total + pagar — peça focal, elevação maior */}
-              <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-md shadow-primary/[0.04]">
+              <div className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">
                     Total do ciclo
@@ -434,12 +432,12 @@ function EstadoVazio({
   texto: string;
 }) {
   return (
-    <div className="mt-10 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-14 text-center">
-      <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Icone className="size-6" />
+    <div className="mt-8 flex flex-col items-center gap-2.5 rounded-2xl border border-dashed border-border py-10 text-center">
+      <span className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Icone className="size-5" />
       </span>
-      <p className="font-medium text-foreground">{titulo}</p>
-      <p className="max-w-xs text-sm text-muted-foreground">{texto}</p>
+      <p className="text-sm font-medium text-foreground">{titulo}</p>
+      <p className="max-w-xs text-[13px] text-muted-foreground">{texto}</p>
     </div>
   );
 }

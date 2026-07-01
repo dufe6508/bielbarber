@@ -9,7 +9,7 @@ import {
   Check,
   Package as PackageIcon,
   Layers,
-  Hash,
+  Ticket,
   X,
   Loader2,
 } from "lucide-react";
@@ -123,7 +123,7 @@ export default function PacotesPage() {
           className="mt-8 grid gap-5 md:grid-cols-2"
         >
           {data.map((pkg) => {
-            const TipoIcone = pkg.tipo === "combo" ? Layers : Hash;
+            const TipoIcone = pkg.tipo === "combo" ? Layers : Ticket;
             const itens = [
               ...pkg.servicos.map((s) => s.servico.nome),
               ...pkg.produtos.map(
@@ -135,58 +135,62 @@ export default function PacotesPage() {
               <motion.article
                 key={pkg.id}
                 variants={cardVariants}
-                whileHover={reduzir ? undefined : { y: -5 }}
+                whileHover={reduzir ? undefined : { y: -4 }}
                 whileTap={reduzir ? undefined : { scale: 0.99 }}
                 transition={{ type: "spring", stiffness: 320, damping: 26 }}
-                className="group/pkg relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm transition-[box-shadow,border-color] duration-300 hover:border-primary/25 hover:shadow-xl hover:shadow-primary/[0.06]"
+                className="group/pkg relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-[box-shadow,border-color] duration-300 hover:border-primary/25 hover:shadow-lg"
               >
                 {/* Top accent — revela no hover */}
                 <span
                   aria-hidden="true"
                   className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 transition-opacity duration-300 group-hover/pkg:opacity-100"
                 />
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-primary">
-                      <TipoIcone className="size-3.5" aria-hidden="true" />
-                      {pkg.tipo === "combo" ? "Combo" : "Quantidade"}
+
+                {/* Cabeçalho: tipo + destaque de quantidade */}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/70 px-2.5 py-1 text-[11px] font-medium text-foreground">
+                    <TipoIcone className="size-3.5" aria-hidden="true" />
+                    {pkg.tipo === "combo" ? "Combo" : "Pacote"}
+                  </span>
+                  {pkg.tipo === "quantidade" && pkg.quantidadeTotal ? (
+                    <span className="font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">
+                      {pkg.quantidadeTotal} cortes
                     </span>
-                    <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight text-foreground">
-                      {pkg.nome}
-                    </h2>
-                    {pkg.descricao && (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {pkg.descricao}
-                      </p>
-                    )}
-                  </div>
+                  ) : null}
                 </div>
 
+                <h2 className="mt-3.5 font-heading text-lg font-semibold tracking-tight text-foreground">
+                  {pkg.nome}
+                </h2>
+                {pkg.descricao && (
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                    {pkg.descricao}
+                  </p>
+                )}
+
                 {itens.length > 0 && (
-                  <ul className="mt-5 space-y-2 border-t border-dashed border-border pt-5">
+                  <ul className="mt-4 space-y-2 border-t border-dashed border-border pt-4">
                     {itens.map((item, i) => (
                       <li
                         key={i}
-                        className="flex items-center gap-2.5 text-sm text-foreground"
+                        className="flex items-center gap-2.5 text-[13px] text-foreground"
                       >
-                        <Check
-                          className="size-4 shrink-0 text-primary"
-                          strokeWidth={2.5}
-                          aria-hidden="true"
-                        />
+                        <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-foreground/[0.08]">
+                          <Check className="size-3 text-foreground" strokeWidth={3} aria-hidden="true" />
+                        </span>
                         {item}
                       </li>
                     ))}
                   </ul>
                 )}
 
-                <div className="mt-auto flex items-end justify-between gap-4 pt-6">
-                  <div>
-                    <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                <div className="mt-auto flex items-end justify-between gap-3 pt-5">
+                  <div className="min-w-0">
+                    <span className="block font-mono text-2xl font-bold tabular-nums leading-none text-foreground">
                       {formatarPreco(pkg.preco)}
                     </span>
                     {pkg.validadeDias && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
                         Válido por {pkg.validadeDias} dias
                       </p>
                     )}
@@ -194,7 +198,7 @@ export default function PacotesPage() {
                   <button
                     type="button"
                     onClick={() => setAtivando(pkg)}
-                    className="inline-flex h-11 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
+                    className="inline-flex h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.97]"
                   >
                     Quero esse
                   </button>

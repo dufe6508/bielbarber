@@ -150,24 +150,25 @@ export function AgendamentosManager() {
               >
                 <button
                   onClick={() => setAberto(expandido ? null : a.id)}
-                  className="flex w-full items-center gap-3 p-4 text-left"
+                  className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-accent/30"
                 >
-                  <div className="flex flex-col items-center justify-center rounded-xl bg-muted/70 px-3 py-1.5">
-                    <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                  {/* Horário — bloco de destaque */}
+                  <div className="flex w-[52px] shrink-0 flex-col items-center justify-center rounded-xl bg-muted/70 py-1.5">
+                    <span className="font-mono text-[15px] font-bold leading-none tabular-nums text-foreground">
                       {a.horarioInicio}
                     </span>
-                    <span className="font-mono text-[10px] text-muted-foreground">
+                    <span className="mt-0.5 font-mono text-[10px] text-muted-foreground">
                       {formatarData(dia).slice(0, 5)}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-foreground">{a.cliente.nome}</p>
+                    <p className="truncate text-sm font-semibold text-foreground">{a.cliente.nome}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {a.servicos.map((s) => s.servico.nome).join(", ")}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span className="font-mono text-sm font-bold tabular-nums text-foreground">
                       {formatarPreco(a.valorTotal)}
                     </span>
                     <div className="flex gap-1">
@@ -268,11 +269,12 @@ function AcaoBtn({
   label: string;
   cor: "verde" | "amber" | "vermelho" | "azul";
 }) {
+  // Alinhado à paleta semântica do sistema (mesmos tons do Pill) para consistência.
   const cores: Record<string, string> = {
-    verde: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20",
-    amber: "bg-amber-500/12 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20",
-    vermelho: "bg-red-500/12 text-red-700 dark:text-red-400 hover:bg-red-500/20",
-    azul: "bg-blue-500/12 text-blue-700 dark:text-blue-400 hover:bg-blue-500/20",
+    verde: "bg-success-muted text-success-muted-foreground hover:brightness-[0.97]",
+    amber: "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:brightness-[0.97]",
+    vermelho: "bg-danger-muted text-danger-muted-foreground hover:brightness-[0.97]",
+    azul: "bg-foreground/[0.08] text-foreground/80 dark:bg-white/10 dark:text-white/85 hover:brightness-[0.97]",
   };
   return (
     <button

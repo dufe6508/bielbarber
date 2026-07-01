@@ -241,16 +241,18 @@ export function NotificationCenter({
                     </p>
                   </div>
                 ) : (
-                  <ul className="divide-y divide-border/60">
-                    {filtrados.map((n) => (
-                      <Item
-                        key={n.id}
-                        n={n}
-                        onAbrir={() => abrirItem(n)}
-                        onFixar={() => patch.mutate({ id: n.id, fixada: !n.fixada })}
-                        onRemover={() => remover.mutate(n.id)}
-                      />
-                    ))}
+                  <ul className="divide-y divide-border/40">
+                    <AnimatePresence initial={false}>
+                      {filtrados.map((n) => (
+                        <Item
+                          key={n.id}
+                          n={n}
+                          onAbrir={() => abrirItem(n)}
+                          onFixar={() => patch.mutate({ id: n.id, fixada: !n.fixada })}
+                          onRemover={() => remover.mutate(n.id)}
+                        />
+                      ))}
+                    </AnimatePresence>
                   </ul>
                 )}
               </div>
@@ -339,10 +341,10 @@ function Chip({
     <button
       onClick={onClick}
       className={cn(
-        "shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+        "shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all duration-200 active:scale-95",
         ativo
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
+          ? "bg-foreground text-background shadow-sm"
+          : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
       {children}
@@ -364,58 +366,68 @@ function Item({
   const { Icone } = CATEGORIAS[n.categoria];
   const urgente = n.prioridade === "urgente" || n.prioridade === "alta";
   return (
-    <li
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
       className={cn(
-        "group relative flex gap-3 py-3.5 pl-5 pr-3 transition-colors hover:bg-accent/40",
-        !n.lida && "bg-accent/20"
+        "group relative flex gap-3 px-4 py-3 transition-colors duration-200",
+        !n.lida ? "bg-primary/[0.035] hover:bg-primary/[0.06]" : "hover:bg-accent/40"
       )}
     >
-      {/* Barra de não-lida — indicador vertical fino na borda */}
+      {/* Não-lida — barrinha lateral fina e discreta (não a barra cheia antiga) */}
       {!n.lida && (
-        <span className="absolute left-0 top-3.5 bottom-3.5 w-[3px] rounded-full bg-primary" />
+        <span className="absolute inset-y-2.5 left-0 w-[2.5px] rounded-full bg-primary/50" />
       )}
 
       {/* Ícone da categoria */}
       <span
         className={cn(
-          "mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl",
-          urgente ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+          "mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+          urgente
+            ? "bg-foreground text-background"
+            : "bg-muted/70 text-muted-foreground group-hover:bg-muted"
         )}
       >
-        <Icone className="size-[18px]" strokeWidth={2} />
+        <Icone className="size-[17px]" strokeWidth={2} />
       </span>
 
       <div className="min-w-0 flex-1">
-        {/* Linha superior: título + horário */}
+        {/* Linha superior: título + horário + ponto de não-lida */}
         <button onClick={onAbrir} className="block w-full text-left">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-1.5">
-              {n.fixada && <Pin className="size-3 shrink-0 fill-current text-muted-foreground" />}
+            <span className="flex min-w-0 items-center gap-1.5">
+              {n.fixada && <Pin className="size-3 shrink-0 fill-current text-muted-foreground/70" />}
               <span
                 className={cn(
-                  "truncate text-sm text-foreground",
+                  "truncate text-[13.5px] leading-tight text-foreground",
                   !n.lida ? "font-semibold" : "font-medium"
                 )}
               >
                 {n.titulo}
               </span>
-            </div>
-            <span className="mt-0.5 shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground/60">
-              {tempoRelativo(n.criadoEm)}
+            </span>
+            <span className="mt-px flex shrink-0 items-center gap-1.5">
+              <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/60">
+                {tempoRelativo(n.criadoEm)}
+              </span>
+              {!n.lida && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
             </span>
           </div>
-          <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">
+          <p className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">
             {n.mensagem}
           </p>
         </button>
 
-        {/* Ações discretas — aparecem no hover/foco */}
-        <div className="mt-2 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+        {/* Ações — ícone-texto discreto. No desktop aparecem no hover/foco. */}
+        <div className="mt-1.5 -ml-1.5 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
           <button
             onClick={onFixar}
             aria-label={n.fixada ? "Desafixar" : "Fixar"}
             className={cn(
-              "inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors hover:bg-background",
+              "inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors hover:bg-muted",
               n.fixada ? "text-foreground" : "text-muted-foreground/70 hover:text-foreground"
             )}
           >
@@ -432,6 +444,6 @@ function Item({
           </button>
         </div>
       </div>
-    </li>
+    </motion.li>
   );
 }
