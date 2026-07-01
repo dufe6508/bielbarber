@@ -82,8 +82,12 @@ export async function sincronizarAgenda(
     );
 
     // Registra o último erro do Google (ou limpa se deu tudo certo) — visível
-    // no painel em vez de só no console do servidor.
-    const erroGoogle = resultados.find((r) => r.provider === "google" && !r.ok);
+    // no painel em vez de só no console do servidor. "alvo_nao_suportado" é
+    // esperado pro target "cliente" (Google só sincroniza a agenda do admin) —
+    // não é falha, ignora pra não mascarar o resultado real do target "admin".
+    const erroGoogle = resultados.find(
+      (r) => r.provider === "google" && !r.ok && r.motivo !== "alvo_nao_suportado"
+    );
     const okGoogle = resultados.some((r) => r.provider === "google" && r.ok);
     if (erroGoogle) {
       await prisma.setting.upsert({
