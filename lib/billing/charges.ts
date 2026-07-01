@@ -262,11 +262,20 @@ export async function confirmarPagamento(
   chargeId: string,
   opts: ConfirmarOpts = {}
 ): Promise<SubscriptionCharge> {
+  // Claim atômico: o Mercado Pago reentrega o mesmo webhook de pagamento (rede,
+  // retry, etc.), então 2 chamadas concorrentes podem chegar aqui pro mesmo
+  // chargeId. Sem isso, ambas passariam pelo antigo check "status === pago"
+  // antes que qualquer uma escrevesse, duplicando push ao admin, ativação de
+  // pacote e (no fluxo de agendamento) a tentativa de criar o horário 2x.
+  const claim = await prisma.subscriptionCharge.updateMany({
+    where: { id: chargeId, status: { not: "pago" } },
+    data: { status: "pago" },
+  });
   const charge = await prisma.subscriptionCharge.findUnique({
     where: { id: chargeId },
   });
   if (!charge) throw new Error("Cobrança não encontrada");
-  if (charge.status === "pago") return charge;
+  if (claim.count === 0) return charge; // já paga / já reivindicada por outra chamada
 
   if (charge.tipo === "pacote") return confirmarPacote(charge, opts);
   if (charge.tipo === "pedido") return confirmarPedidoCharge(charge, opts);

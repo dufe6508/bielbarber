@@ -111,9 +111,11 @@ export function MpPaymentBrick({
     <Payment
       initialization={{ amount }}
       customization={{
+        // Só cartão (crédito) + Pix. Qualquer categoria omitida aqui já fica
+        // desabilitada pelo Brick — não precisa excluir explicitamente débito/
+        // boleto/saldo Mercado Pago, só não os declarar.
         paymentMethods: {
           creditCard: "all",
-          debitCard: "all",
           bankTransfer: ["pix"],
         },
         visual: {

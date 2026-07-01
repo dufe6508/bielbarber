@@ -34,10 +34,13 @@ export async function eventoDoAgendamento(
 
   return {
     uid: `${ag.id}@bielbarber`,
-    titulo: `Corte · Biel Barber Shop`,
+    // Título e descrição priorizam cliente/serviço/horário — empresa e endereço
+    // ficam em campos secundários (location), não no destaque principal do evento.
+    titulo: ag.cliente.nome,
     descricao: [
-      `Cliente: ${ag.cliente.nome}`,
-      servicos.length ? `Serviços: ${servicos.join(", ")}` : null,
+      servicos.length ? `Serviço: ${servicos.join(", ")}` : null,
+      `Horário: ${ag.horarioInicio}`,
+      `Biel Barber Shop`,
     ]
       .filter(Boolean)
       .join("\n"),
