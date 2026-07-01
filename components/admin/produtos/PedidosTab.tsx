@@ -54,7 +54,7 @@ const FILTROS = [
   { id: "pago", rotulo: "Pagos" },
 ] as const;
 
-export default function PedidosAdminPage() {
+export function PedidosTab() {
   const [filtro, setFiltro] = useState<typeof FILTROS[number]["id"]>("todos");
   const [lista, setLista] = useState<Pedido[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -79,14 +79,7 @@ export default function PedidosAdminPage() {
   }, [carregar]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">Pedidos da Loja</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Gerencie os pedidos de produtos feitos pelos clientes. Marque como pago e controle a retirada.
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {/* Filtros */}
       <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {FILTROS.map((f) => (

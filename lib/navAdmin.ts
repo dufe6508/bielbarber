@@ -27,7 +27,6 @@ export const navAdmin: ItemNavAdmin[] = [
   { href: "/admin/clientes", rotulo: "Clientes", icone: Users },
   { href: "/admin/servicos", rotulo: "Serviços", icone: Scissors },
   { href: "/admin/produtos", rotulo: "Loja", icone: ShoppingBag },
-  { href: "/admin/pedidos", rotulo: "Pedidos", icone: ShoppingCart },
   { href: "/admin/galeria", rotulo: "Galeria", icone: Images },
   { href: "/admin/pacotes", rotulo: "Assinaturas", icone: Crown },
   { href: "/admin/mensalistas", rotulo: "Mensalistas", icone: Users },
