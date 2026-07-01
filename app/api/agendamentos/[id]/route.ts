@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
 import { dataISOLocal } from "@/lib/utils/format";
+import { proximaHora } from "@/lib/utils/slots";
 
 // Avisa a fila de espera daquela data que abriu um horário.
 async function avisarListaEspera(data: Date): Promise<void> {
@@ -170,18 +171,28 @@ export async function PATCH(
       );
     }
 
-    // Slot livre? (ignora cancelados e o próprio agendamento)
+    // Mesma quantidade de slots que o agendamento já ocupava (ex: coloração = 2)
+    const slotsNecessarios = agendamento.slots;
+    const horariosNecessarios =
+      slotsNecessarios >= 2 ? [horario, proximaHora(horario)] : [horario];
+
+    // Slots livres? (ignora cancelados e o próprio agendamento)
     const ocupado = await prisma.appointment.findFirst({
       where: {
         data: new Date(data),
-        horarioInicio: horario,
+        horarioInicio: { in: horariosNecessarios },
         status: { notIn: ["cancelado"] },
         id: { not: id },
       },
     });
     if (ocupado) {
       return NextResponse.json(
-        { error: "Esse horário já está ocupado. Escolha outro." },
+        {
+          error:
+            slotsNecessarios >= 2
+              ? "Esse serviço precisa de 2 horários seguidos livres. Escolha outro."
+              : "Esse horário já está ocupado. Escolha outro.",
+        },
         { status: 409 }
       );
     }

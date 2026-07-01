@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { telefoneLembrado } from "@/lib/utils/telefone";
 
@@ -33,16 +33,18 @@ type Resposta = { itens: Notificacao[]; naoLidas: number };
 
 const POLL_MS = 60_000;
 
+function subscreveStorage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function snapshotServidor() {
+  return "";
+}
+
 // Lê o telefone do localStorage de forma reativa (atualiza após hidratar).
 export function useTelefoneCliente(): string {
-  const [tel, setTel] = useState("");
-  useEffect(() => {
-    setTel(telefoneLembrado());
-    const onStorage = () => setTel(telefoneLembrado());
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-  return tel;
+  return useSyncExternalStore(subscreveStorage, telefoneLembrado, snapshotServidor);
 }
 
 export function useNotificacoes(audiencia: "cliente" | "admin") {

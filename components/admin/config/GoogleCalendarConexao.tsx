@@ -12,7 +12,6 @@ export function GoogleCalendarConexao() {
   const [desconectando, setDesconectando] = useState(false);
 
   async function carregarStatus() {
-    setCarregando(true);
     try {
       const res = await fetch("/api/admin/google-calendar/status");
       if (res.ok) setStatus(await res.json());
@@ -37,7 +36,16 @@ export function GoogleCalendarConexao() {
       window.history.replaceState({}, "", window.location.pathname);
     }
 
-    carregarStatus();
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/google-calendar/status");
+        if (res.ok) setStatus(await res.json());
+      } catch {
+        // silencioso
+      } finally {
+        setCarregando(false);
+      }
+    })();
   }, []);
 
   async function desconectar() {

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
@@ -199,7 +198,7 @@ export async function POST(request: Request) {
       // Mensalista: só aceita se o cliente tiver assinatura ativa
       if (ehMensalista) {
         if (!cliente.mensalidade || cliente.mensalidade.status !== "ativo") {
-          throw new Error("Você não está cadastrado como mensalista. Escolha outra forma de pagamento.");
+          throw new Error("NAO_MENSALISTA");
         }
       }
 
@@ -222,9 +221,6 @@ export async function POST(request: Request) {
 
       return novo;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-
-    // Invalida o cache de slots da data agendada
-    revalidateTag(`slots-${data}`, {});
 
     // Notifica cliente (confirmação) + admin (novo agendamento). Best-effort.
     void notify({
@@ -273,9 +269,18 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
+    if (msg === "NAO_MENSALISTA") {
+      return NextResponse.json(
+        { error: "Você não está cadastrado como mensalista. Escolha outra forma de pagamento." },
+        { status: 400 }
+      );
+    }
+    // Qualquer outro erro (falha de DB, etc.) → 500, não 403 — evita mascarar
+    // erro de servidor como se fosse recusa de regra de negócio.
+    console.error("Erro ao criar agendamento:", error);
     return NextResponse.json(
-      { error: msg || "Erro ao processar agendamento." },
-      { status: 403 }
+      { error: "Erro ao processar agendamento." },
+      { status: 500 }
     );
   }
 }

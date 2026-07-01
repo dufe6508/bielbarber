@@ -9,16 +9,18 @@
  *   "produtos"          — lista de produtos ativos
  *   "agenda-semanal"    — agenda padrão dos 7 dias da semana
  *   "config"            — configurações (horizonte de agendamento)
- *   "slots-{YYYY-MM-DD}"— slots disponíveis de uma data específica
  *
  * Para invalidar, importe `revalidateTag` de "next/cache" e chame:
  *   revalidateTag("servicos")
- *   revalidateTag(`slots-${data}`)
+ *
+ * Slots disponíveis (getSlotsDisponiveis) NÃO passam por cache: a invalidação
+ * por tag não se mostrou confiável aqui e disponibilidade errada (cache
+ * desatualizado após cancelar/remarcar) é pior que uma query a mais.
  */
 
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getAgendaSemanal, getSlotsDisponiveis, getHorizonteDias } from "@/lib/utils/slots";
+import { getAgendaSemanal, getHorizonteDias } from "@/lib/utils/slots";
 
 // ─── Serviços ativos ───────────────────────────────────────────────────────
 export const cachedServicos = unstable_cache(
@@ -57,17 +59,3 @@ export const cachedHorizonteDias = unstable_cache(
   ["config"],
   { tags: ["config"] }
 );
-
-// ─── Slots disponíveis por data ────────────────────────────────────────────
-// Cada data tem sua própria entrada de cache com tag `slots-YYYY-MM-DD`.
-// TTL de 60 s como segurança extra (por se slots forem gerados concorrentemente).
-export function cachedSlots(data: string) {
-  return unstable_cache(
-    async () => getSlotsDisponiveis(data),
-    [`slots-${data}`],
-    {
-      tags: [`slots-${data}`],
-      revalidate: 60,
-    }
-  )();
-}

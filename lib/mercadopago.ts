@@ -22,9 +22,15 @@ export function baseUrl(): string {
 }
 
 // Importa o SDK só quando há credencial — mantém o build leve e desacoplado.
+// timeout evita que uma chamada trave pra sempre (ex: rede instável) — sem
+// isso, o Brick no cliente fica em loading infinito esperando uma promise
+// que nunca resolve nem rejeita.
 async function client() {
   const { MercadoPagoConfig } = await import("mercadopago");
-  return new MercadoPagoConfig({ accessToken: ACCESS_TOKEN! });
+  return new MercadoPagoConfig({
+    accessToken: ACCESS_TOKEN!,
+    options: { timeout: 10_000 },
+  });
 }
 
 export type PreferenciaInput = {

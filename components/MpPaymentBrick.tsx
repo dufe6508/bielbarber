@@ -34,9 +34,11 @@ export function MpPaymentBrick({
   const onResultRef = useRef(onResult);
   const onErroRef = useRef(onErro);
   const onReadyRef = useRef(onReadyChange);
-  onResultRef.current = onResult;
-  onErroRef.current = onErro;
-  onReadyRef.current = onReadyChange;
+  useEffect(() => {
+    onResultRef.current = onResult;
+    onErroRef.current = onErro;
+    onReadyRef.current = onReadyChange;
+  });
 
   useEffect(() => {
     if (!PUB) {
@@ -47,7 +49,6 @@ export function MpPaymentBrick({
       initMercadoPago(PUB, { locale: "pt-BR" });
       inited = true;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Callbacks com deps vazias — referência estável para o SDK do MP não
@@ -62,11 +63,19 @@ export function MpPaymentBrick({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSubmit = useCallback(async ({ formData }: { formData: any }) => {
-    const res = await fetch("/api/pagamentos/mercadopago/processar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chargeId, formData }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/pagamentos/mercadopago/processar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargeId, formData }),
+        // Sem timeout aqui o Brick fica girando pra sempre se a requisição travar.
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      onErroRef.current?.("Sem resposta do servidor. Tente novamente.");
+      throw new Error("Tempo esgotado ao processar o pagamento.");
+    }
     const d = await res.json().catch(() => null);
     if (!res.ok) {
       onErroRef.current?.(d?.error);

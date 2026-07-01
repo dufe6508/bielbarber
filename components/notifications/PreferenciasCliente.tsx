@@ -25,13 +25,10 @@ const LINHAS: { chave: keyof Prefs; rotulo: string; desc: string }[] = [
 
 export function PreferenciasCliente({ telefone }: { telefone: string }) {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
-  const [carregando, setCarregando] = useState(true);
+  const [carregando, setCarregando] = useState(telefone.length >= 10);
 
   useEffect(() => {
-    if (telefone.length < 10) {
-      setCarregando(false);
-      return;
-    }
+    if (telefone.length < 10) return;
     fetch(`/api/push/preferences?telefone=${encodeURIComponent(telefone)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setPrefs(d))

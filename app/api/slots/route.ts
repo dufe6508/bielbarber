@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { cachedSlots } from "@/lib/cache";
+import { getSlotsDisponiveis } from "@/lib/utils/slots";
 
+// Sem cache: volume da barbearia é baixo (10-12 cortes/dia) e disponibilidade
+// errada (cache desatualizado após cancelar/remarcar) é pior que uma query a mais.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const data = searchParams.get("data");
@@ -12,6 +14,6 @@ export async function GET(request: Request) {
     );
   }
 
-  const slots = await cachedSlots(data);
+  const slots = await getSlotsDisponiveis(data);
   return NextResponse.json(slots);
 }
