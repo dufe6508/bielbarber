@@ -16,18 +16,20 @@ import {
   CreditCard,
   AlertCircle,
   Smartphone,
+  ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatarPreco, formatarData } from "@/lib/utils/format";
-import type { ResultadoPagamento } from "@/components/MpPaymentBrick";
+import type { ResultadoCartao } from "@/components/MpCardBrick";
 
-// O Brick depende de `window` — carrega só no cliente.
-const MpPaymentBrick = dynamic(
-  () => import("@/components/MpPaymentBrick").then((m) => m.MpPaymentBrick),
+// Brick de cartão depende de `window` — carrega só no cliente.
+const MpCardBrick = dynamic(
+  () => import("@/components/MpCardBrick").then((m) => m.MpCardBrick),
   { ssr: false }
 );
 
-type Etapa = "form" | "pix" | "sucesso" | "pendente";
+type Etapa = "metodo" | "pix" | "cartao" | "sucesso" | "pendente";
 type Pix = { qrCode: string; qrCodeBase64: string; ticketUrl: string | null };
 
 export function PagamentoDrawer({
@@ -57,47 +59,77 @@ export function PagamentoDrawer({
   tituloSucesso?: string;
   textoSucesso?: string;
 }) {
-  const [etapa, setEtapa] = useState<Etapa>("form");
+  const [etapa, setEtapa] = useState<Etapa>("metodo");
   const [pix, setPix] = useState<Pix | null>(null);
+  const [gerandoPix, setGerandoPix] = useState(false);
   const [brickPronto, setBrickPronto] = useState(false);
   const [mostrarFallback, setMostrarFallback] = useState(false);
   const [redirecionando, setRedirecionando] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
-  // Fallback após 8s se o brick não carregar (ex: adblocker)
+  // Fallback após 8s se o brick de cartão não carregar (ex: adblocker).
   useEffect(() => {
-    if (!open || etapa !== "form" || brickPronto) return;
+    if (!open || etapa !== "cartao" || brickPronto) return;
     const t = setTimeout(() => setMostrarFallback(true), 8000);
     return () => clearTimeout(t);
   }, [open, etapa, brickPronto]);
 
-  // Bloquear scroll do body quando modal aberto
+  // Bloquear scroll do body quando modal aberto.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => {
       document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
+    };
   }, [open]);
 
   function fechar() {
     onOpenChange(false);
-    // Reset com delay para não piscar durante a animação de saída
     setTimeout(() => {
-      setEtapa("form");
+      setEtapa("metodo");
       setPix(null);
+      setGerandoPix(false);
       setBrickPronto(false);
       setMostrarFallback(false);
     }, 300);
   }
 
-  function handleResult(r: ResultadoPagamento) {
-    if (r.tipo === "pix") {
-      setPix({ qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, ticketUrl: r.ticketUrl });
-      setEtapa("pix");
-      return;
+  // Pix: gera o pagamento direto (sem Brick, sem campo de e-mail) e mostra o QR.
+  async function escolherPix() {
+    if (!chargeId || gerandoPix) return;
+    setGerandoPix(true);
+    try {
+      const res = await fetch("/api/pagamentos/mercadopago/processar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargeId, formData: { payment_method_id: "pix" } }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const d = await res.json().catch(() => null);
+      if (!res.ok || !d) {
+        toast.error(d?.error ?? "Não foi possível gerar o Pix. Tente novamente.");
+        return;
+      }
+      if (d.pix?.qrCode) {
+        setPix({ qrCode: d.pix.qrCode, qrCodeBase64: d.pix.qrCodeBase64, ticketUrl: d.pix.ticketUrl });
+        setEtapa("pix");
+        return;
+      }
+      toast.error("Não foi possível gerar o Pix. Tente pelo cartão.");
+    } catch {
+      toast.error("Falha ao gerar o Pix. Verifique sua conexão.");
+    } finally {
+      setGerandoPix(false);
     }
+  }
+
+  function escolherCartao() {
+    setBrickPronto(false);
+    setMostrarFallback(false);
+    setEtapa("cartao");
+  }
+
+  function handleCartaoResult(r: ResultadoCartao) {
     if (r.tipo === "aprovado") {
       setEtapa("sucesso");
       onPago?.();
@@ -175,9 +207,19 @@ export function PagamentoDrawer({
               {/* Header */}
               <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
                 <div className="flex items-center gap-2">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-primary/10">
-                    <ShieldCheck className="size-3.5 text-primary" aria-hidden="true" />
-                  </span>
+                  {(etapa === "cartao" || etapa === "pix") ? (
+                    <button
+                      onClick={() => setEtapa("metodo")}
+                      aria-label="Voltar"
+                      className="flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <ArrowLeft className="size-4" />
+                    </button>
+                  ) : (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-primary/10">
+                      <ShieldCheck className="size-3.5 text-primary" aria-hidden="true" />
+                    </span>
+                  )}
                   <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                     Pagamento Seguro · {barbearia}
                   </span>
@@ -195,17 +237,15 @@ export function PagamentoDrawer({
               <div className="flex-1 overflow-y-auto">
                 <AnimatePresence mode="wait">
 
-                  {/* ── Etapa: formulário de pagamento ── */}
-                  {etapa === "form" && (
-                    <Passo key="form">
-                      {/* Valor em destaque */}
-                      <div className="px-5 pb-5 pt-6">
+                  {/* ── Etapa: escolha do método ── */}
+                  {etapa === "metodo" && (
+                    <Passo key="metodo">
+                      <div className="px-5 pb-6 pt-6">
                         <ValorDestaque
                           total={total}
                           legenda={legenda ?? (descricao ?? `Pagamento · ${barbearia}`)}
                         />
 
-                        {/* Info da cobrança */}
                         {(vencimento || descricao) && (
                           <div className="mt-4 space-y-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm">
                             {descricao && (
@@ -227,50 +267,71 @@ export function PagamentoDrawer({
                           </div>
                         )}
 
-                        {/* Métodos aceitos */}
-                        <div className="mt-4 flex items-center gap-4">
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                            <QrCode className="size-3.5" /> Pix
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                            <CreditCard className="size-3.5" /> Cartão
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Brick MP */}
-                      <div className="px-5 pb-6">
                         {chargeId ? (
-                          <div className="relative min-h-[200px]">
-                            {/* Loading state enquanto o SDK inicializa */}
-                            {!brickPronto && !mostrarFallback && (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30">
-                                <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
-                                  <Loader2 className="size-5 animate-spin text-primary" />
-                                </div>
-                                <p className="text-sm text-muted-foreground">Carregando formulário…</p>
-                              </div>
-                            )}
-                            <MpPaymentBrick
-                              amount={total}
-                              chargeId={chargeId}
-                              onReadyChange={setBrickPronto}
-                              onResult={handleResult}
-                              onErro={(msg) => {
-                                if (msg) toast.error(msg);
-                                setMostrarFallback(true);
-                              }}
+                          <div className="mt-5 space-y-2.5">
+                            <p className="px-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              Como você prefere pagar?
+                            </p>
+                            <MetodoBotao
+                              icone={<QrCode className="size-5" />}
+                              titulo="Pix"
+                              subtitulo="Na hora, com QR Code"
+                              onClick={escolherPix}
+                              loading={gerandoPix}
+                            />
+                            <MetodoBotao
+                              icone={<CreditCard className="size-5" />}
+                              titulo="Cartão"
+                              subtitulo="Crédito, parcelamento disponível"
+                              onClick={escolherCartao}
+                              disabled={gerandoPix}
                             />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+                          <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
                             <AlertCircle className="size-4 shrink-0 text-destructive" />
                             Cobrança não encontrada.
                           </div>
                         )}
+                      </div>
+                    </Passo>
+                  )}
 
-                        {/* Fallback: Checkout Pro externo */}
-                        {mostrarFallback && chargeId && (
+                  {/* ── Etapa: formulário de cartão ── */}
+                  {etapa === "cartao" && chargeId && (
+                    <Passo key="cartao">
+                      <div className="px-5 pb-6 pt-5">
+                        <div className="mb-4 flex items-center justify-between">
+                          <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <CreditCard className="size-4 text-primary" /> Pagar com cartão
+                          </span>
+                          <span className="font-mono text-sm font-bold tabular-nums text-foreground">
+                            {formatarPreco(total)}
+                          </span>
+                        </div>
+
+                        <div className="relative min-h-[220px]">
+                          {!brickPronto && !mostrarFallback && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30">
+                              <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
+                                <Loader2 className="size-5 animate-spin text-primary" />
+                              </div>
+                              <p className="text-sm text-muted-foreground">Carregando formulário…</p>
+                            </div>
+                          )}
+                          <MpCardBrick
+                            amount={total}
+                            chargeId={chargeId}
+                            onReadyChange={setBrickPronto}
+                            onResult={handleCartaoResult}
+                            onErro={(msg) => {
+                              if (msg) toast.error(msg);
+                              setMostrarFallback(true);
+                            }}
+                          />
+                        </div>
+
+                        {mostrarFallback && (
                           <motion.div
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -311,7 +372,6 @@ export function PagamentoDrawer({
                   {etapa === "pix" && pix && (
                     <Passo key="pix">
                       <div className="flex flex-col items-center px-5 pb-8 pt-6">
-                        {/* Ícone Pix */}
                         <div className="flex size-14 items-center justify-center rounded-2xl bg-[#00B37E]/10">
                           <Smartphone className="size-7 text-[#00B37E]" />
                         </div>
@@ -320,14 +380,12 @@ export function PagamentoDrawer({
                           Escaneie o QR Code ou copie o código abaixo
                         </p>
 
-                        {/* Valor */}
                         <div className="mt-4 rounded-xl bg-muted/50 px-5 py-2">
                           <span className="font-mono text-xl font-bold tabular-nums text-foreground">
                             {formatarPreco(total)}
                           </span>
                         </div>
 
-                        {/* QR Code */}
                         {pix.qrCodeBase64 ? (
                           <div className="mt-5 rounded-2xl border-2 border-border bg-white p-3 shadow-md">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -339,7 +397,6 @@ export function PagamentoDrawer({
                           </div>
                         ) : null}
 
-                        {/* Botão copiar */}
                         <button
                           type="button"
                           onClick={copiarPix}
@@ -457,6 +514,40 @@ export function PagamentoDrawer({
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+function MetodoBotao({
+  icone,
+  titulo,
+  subtitulo,
+  onClick,
+  loading,
+  disabled,
+}: {
+  icone: React.ReactNode;
+  titulo: string;
+  subtitulo: string;
+  onClick: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading || disabled}
+      className="group flex w-full items-center gap-3.5 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:bg-accent/40 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+        {loading ? <Loader2 className="size-5 animate-spin" /> : icone}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-foreground">{titulo}</span>
+        <span className="block text-xs text-muted-foreground">{subtitulo}</span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+    </button>
   );
 }
 

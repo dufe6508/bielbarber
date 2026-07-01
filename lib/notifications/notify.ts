@@ -27,7 +27,13 @@ export async function notify(event: NotificationEvent): Promise<void> {
         if (s.audiencia === "cliente" && s.clienteId) {
           await enviarPushParaCliente(
             s.clienteId,
-            { title: s.titulo, body: s.mensagem, url: s.actionUrl ?? "/", ...s.push },
+            {
+              title: s.titulo,
+              body: s.mensagem,
+              url: s.actionUrl ?? "/",
+              ...s.push,
+              tag: s.push?.tag ?? tagPadrao(s),
+            },
             s.prefFlag
           );
         } else if (s.audiencia === "admin") {
@@ -36,6 +42,10 @@ export async function notify(event: NotificationEvent): Promise<void> {
             body: s.mensagem,
             url: s.actionUrl ?? "/admin",
             ...s.push,
+            // tag estável: quando o mesmo device tem 2 inscrições (aba do Chrome
+            // + PWA instalado), as duas entregas do mesmo evento colapsam numa
+            // notificação só (a nova substitui a anterior de mesma tag/origem).
+            tag: s.push?.tag ?? tagPadrao(s),
           });
         }
       }
@@ -63,6 +73,30 @@ function linha(s: NotificationSpec, clienteId: string | null): Prisma.Notificati
 // Deriva uma chave de tipo estável (categoria como fallback simples).
 function tipoDoSpec(s: NotificationSpec): string {
   return (s.metadata?.tipo as string) || s.categoria;
+}
+
+// Primeiro id estável do metadata (identifica o "assunto" da notificação) —
+// usado para compor a tag de push. Distintos assuntos → tags distintas (não
+// colapsam); o mesmo assunto entregue a 2 inscrições do mesmo device → mesma
+// tag (colapsa numa notificação só).
+const CHAVES_ID = [
+  "appointmentId",
+  "chargeId",
+  "subscriptionId",
+  "orderId",
+  "clientePacoteId",
+  "productId",
+  "clienteId",
+] as const;
+
+function tagPadrao(s: NotificationSpec): string {
+  const meta = s.metadata ?? {};
+  for (const k of CHAVES_ID) {
+    const v = meta[k];
+    if (typeof v === "string" && v) return `${s.audiencia}:${tipoDoSpec(s)}:${v}`;
+  }
+  // Sem id no metadata → cai no título (estável para o mesmo evento).
+  return `${s.audiencia}:${tipoDoSpec(s)}:${s.titulo}`;
 }
 
 // Broadcast genérico do admin (mensagem livre) para todos os clientes ativos.

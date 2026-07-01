@@ -1,22 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
+import { initMercadoPago, CardPayment } from "@mercadopago/sdk-react";
 
-// Wrapper do Payment Brick do Mercado Pago. Carregado só no cliente (via dynamic
-// import com ssr:false no drawer) — o SDK depende de `window`. Tokeniza o cartão
-// no navegador (o número nunca passa pelo nosso servidor) e o formData vai para
-// /api/pagamentos/mercadopago/processar, que cobra o valor autoritativo.
+// Brick de cartão do Mercado Pago (Card Payment) — SÓ o formulário de cartão,
+// sem seletor de método nem Pix. Usado no passo "Cartão" do PagamentoDrawer,
+// depois que o cliente já escolheu o método na nossa própria tela. Tokeniza o
+// cartão no navegador (o número nunca passa pelo nosso servidor) e envia o
+// formData para /api/pagamentos/mercadopago/processar, que cobra o valor
+// autoritativo do servidor.
 
 const PUB = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY;
 let inited = false;
 
-export type ResultadoPagamento =
-  | { tipo: "aprovado" }
-  | { tipo: "pendente" }
-  | { tipo: "pix"; qrCode: string; qrCodeBase64: string; ticketUrl: string | null };
+export type ResultadoCartao = { tipo: "aprovado" } | { tipo: "pendente" };
 
-export function MpPaymentBrick({
+export function MpCardBrick({
   amount,
   chargeId,
   onResult,
@@ -25,12 +24,10 @@ export function MpPaymentBrick({
 }: {
   amount: number;
   chargeId: string;
-  onResult: (r: ResultadoPagamento) => void;
+  onResult: (r: ResultadoCartao) => void;
   onErro: (msg?: string) => void;
   onReadyChange?: (pronto: boolean) => void;
 }) {
-  // Refs para callbacks — assim as funções passadas ao <Payment> têm
-  // referência ESTÁVEL entre renders e o Brick não se reinicializa.
   const onResultRef = useRef(onResult);
   const onErroRef = useRef(onErro);
   const onReadyRef = useRef(onReadyChange);
@@ -51,8 +48,6 @@ export function MpPaymentBrick({
     }
   }, []);
 
-  // Callbacks com deps vazias — referência estável para o SDK do MP não
-  // destruir e recriar o Brick a cada re-render do componente pai.
   const handleReady = useCallback(() => {
     onReadyRef.current?.(true);
   }, []);
@@ -61,15 +56,16 @@ export function MpPaymentBrick({
     onErroRef.current?.(e?.message);
   }, []);
 
+  // O Card Payment Brick entrega o formData direto (diferente do Payment Brick,
+  // que envolve em { selectedPaymentMethod, formData }).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleSubmit = useCallback(async ({ formData }: { formData: any }) => {
+  const handleSubmit = useCallback(async (formData: any): Promise<void> => {
     let res: Response;
     try {
       res = await fetch("/api/pagamentos/mercadopago/processar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chargeId, formData }),
-        // Sem timeout aqui o Brick fica girando pra sempre se a requisição travar.
         signal: AbortSignal.timeout(15_000),
       });
     } catch {
@@ -81,15 +77,6 @@ export function MpPaymentBrick({
       onErroRef.current?.(d?.error);
       throw new Error(d?.error ?? "Falha no pagamento");
     }
-    if (d?.pix) {
-      onResultRef.current({
-        tipo: "pix",
-        qrCode: d.pix.qrCode,
-        qrCodeBase64: d.pix.qrCodeBase64,
-        ticketUrl: d.pix.ticketUrl,
-      });
-      return;
-    }
     if (d?.status === "approved") {
       onResultRef.current({ tipo: "aprovado" });
       return;
@@ -100,24 +87,15 @@ export function MpPaymentBrick({
     }
     // Rejeitado — deixa o Brick exibir o erro e permitir nova tentativa.
     throw new Error("Pagamento recusado. Tente outro cartão.");
-  // chargeId é parte da URL — OK como dep estável (não muda durante a sessão)
+    // chargeId é estável durante a sessão — OK como dep.
   }, [chargeId]);
 
-  if (!PUB) {
-    return null; // O PagamentoDrawer já lida com o fallback
-  }
+  if (!PUB) return null;
 
   return (
-    <Payment
+    <CardPayment
       initialization={{ amount }}
       customization={{
-        // Só cartão (crédito) + Pix. Qualquer categoria omitida aqui já fica
-        // desabilitada pelo Brick — não precisa excluir explicitamente débito/
-        // boleto/saldo Mercado Pago, só não os declarar.
-        paymentMethods: {
-          creditCard: "all",
-          bankTransfer: ["pix"],
-        },
         visual: {
           style: {
             customVariables: {
@@ -129,7 +107,8 @@ export function MpPaymentBrick({
             },
           },
         },
-      }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any}
       onReady={handleReady}
       onError={handleError}
       onSubmit={handleSubmit}

@@ -91,10 +91,10 @@ export function NotificationCenter({
   const filtrados = filtro === "todas" ? itens : itens.filter((n) => n.categoria === filtro);
   // Categorias presentes (chips só do que existe).
   const categoriasPresentes = Array.from(new Set(itens.map((n) => n.categoria)));
-  // Apagáveis = não fixadas (o "Limpar conversa" preserva as fixadas).
+  // Apagáveis = não fixadas (o "Limpar notificações" preserva as fixadas).
   const apagaveis = itens.filter((n) => !n.fixada).length;
 
-  function limparConversa() {
+  function limparNotificacoes() {
     limparTudo.mutate();
     setConfirmandoLimpar(false);
   }
@@ -270,7 +270,7 @@ export function NotificationCenter({
                         className="flex items-center justify-between gap-2"
                       >
                         <span className="pl-1.5 text-xs text-muted-foreground">
-                          Apagar {apagaveis} {apagaveis === 1 ? "mensagem" : "mensagens"}?
+                          Apagar {apagaveis} {apagaveis === 1 ? "notificação" : "notificações"}?
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
@@ -280,7 +280,7 @@ export function NotificationCenter({
                             Cancelar
                           </button>
                           <button
-                            onClick={limparConversa}
+                            onClick={limparNotificacoes}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
                           >
                             <Trash2 className="size-3.5" />
@@ -295,12 +295,12 @@ export function NotificationCenter({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.15 }}
-                        className="flex items-center justify-between gap-2"
+                        className="flex items-center gap-2"
                       >
                         <button
                           onClick={() => marcarTodas.mutate()}
                           disabled={naoLidas === 0}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                         >
                           <CheckCheck className="size-3.5" />
                           Marcar todas
@@ -308,10 +308,10 @@ export function NotificationCenter({
                         <button
                           onClick={() => setConfirmandoLimpar(true)}
                           disabled={apagaveis === 0}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:pointer-events-none disabled:opacity-40"
+                          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500 disabled:pointer-events-none disabled:opacity-40"
                         >
                           <Eraser className="size-3.5" />
-                          Limpar conversa
+                          Limpar notificações
                         </button>
                       </motion.div>
                     )}

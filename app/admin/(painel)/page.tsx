@@ -21,10 +21,8 @@ import {
   serieReceitaPorDia,
   clientesAtivos,
   proximosAtendimentos,
-  resumoFinanceiro,
 } from "@/lib/admin/metrics";
 import { resumoContabil } from "@/lib/admin/accounting";
-import { ResumoFinanceiroCard } from "@/components/admin/ResumoFinanceiroCard";
 import { ProximosAtendimentos } from "@/components/admin/ProximosAtendimentos";
 import { formatarPreco } from "@/lib/utils/format";
 
@@ -49,18 +47,14 @@ export default async function DashboardPage({
   const mesParam = `${ano}-${String(mesIndex + 1).padStart(2, "0")}`;
   const { desde, ate } = janelaMes(ano, mesIndex);
 
-  const [fonte, atend, serie, ativos, conta, proximos, resDia, resSemana, resMes] =
-    await Promise.all([
-      receitaPorFonte(desde, ate),
-      atendimentoNoPeriodo(desde, ate),
-      serieReceitaPorDia(desde, ate),
-      clientesAtivos(2),
-      resumoContabil(ano, mesIndex),
-      proximosAtendimentos(8),
-      resumoFinanceiro("dia"),
-      resumoFinanceiro("semana"),
-      resumoFinanceiro("mes"),
-    ]);
+  const [fonte, atend, serie, ativos, conta, proximos] = await Promise.all([
+    receitaPorFonte(desde, ate),
+    atendimentoNoPeriodo(desde, ate),
+    serieReceitaPorDia(desde, ate),
+    clientesAtivos(2),
+    resumoContabil(ano, mesIndex),
+    proximosAtendimentos(8),
+  ]);
 
   const ags = "/admin/agendamentos";
 
@@ -81,11 +75,6 @@ export default async function DashboardPage({
         href="/admin/financeiro"
         destaque
       />
-
-      {/* Resumo financeiro retrátil — logo abaixo do faturamento, recolhido por padrão */}
-      <div className="mt-3">
-        <ResumoFinanceiroCard dia={resDia} semana={resSemana} mes={resMes} />
-      </div>
 
       {/* Métricas de apoio */}
       <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-3">
