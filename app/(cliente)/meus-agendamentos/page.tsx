@@ -14,7 +14,6 @@ import {
   CalendarClock,
   Clock,
   X,
-  Scissors,
   Award,
   Star,
   Package as PackageIcon,
@@ -291,58 +290,46 @@ function CartaoAgendamento({
       {/* Faixa lateral de status */}
       <span className={cn("absolute inset-y-0 left-0 w-1", v.faixa)} />
 
-      <div className="p-3.5 pl-4">
-        {/* Linha 1: data + badge */}
+      <div className="p-3 pl-3.5">
+        {/* Linha 1: data/hora à esquerda · status + valor à direita */}
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span
-              className={cn(
-                "flex size-9 shrink-0 items-center justify-center rounded-xl",
-                v.ativo
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              <Scissors className="size-[17px]" />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="font-heading text-[15px] font-semibold leading-tight tracking-tight text-foreground">
-                  {capitalizar(formatarDataExtenso(a.data).replace(/\./g, ""))}
-                </p>
-                {relevante(a.data) && (
-                  <span className="rounded-full bg-foreground px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-background">
-                    {rotuloRelativo(a.data)}
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 flex items-center gap-1 font-mono text-[13px] tabular-nums text-muted-foreground">
-                <Clock className="size-3" aria-hidden="true" />
-                {a.horarioInicio}
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="font-heading text-sm font-semibold leading-tight tracking-tight text-foreground">
+                {capitalizar(formatarDataExtenso(a.data).replace(/\./g, ""))}
               </p>
+              {relevante(a.data) && (
+                <span className="rounded-full bg-foreground px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-background">
+                  {rotuloRelativo(a.data)}
+                </span>
+              )}
             </div>
+            <p className="mt-0.5 flex items-center gap-1 font-mono text-xs tabular-nums text-muted-foreground">
+              <Clock className="size-3" aria-hidden="true" />
+              {a.horarioInicio}
+            </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <span
               className={cn(
-                "rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold",
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                 v.badge
               )}
             >
               {v.rotulo}
             </span>
-            <span className="font-mono text-[15px] font-bold tabular-nums text-foreground">
+            <span className="font-mono text-sm font-bold tabular-nums text-foreground">
               {formatarPreco(a.valorTotal)}
             </span>
           </div>
         </div>
 
         {/* Serviços — pills discretas */}
-        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-dashed border-border pt-3">
+        <div className="mt-2.5 flex flex-wrap gap-1 border-t border-dashed border-border pt-2.5">
           {a.servicos.map((s) => (
             <span
               key={s.nome}
-              className="rounded-full border border-border/60 bg-muted/40 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+              className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground"
             >
               {s.nome}
             </span>
@@ -351,20 +338,20 @@ function CartaoAgendamento({
 
         {/* Ações (só para agendado futuro, até 1h antes) */}
         {v.ativo && v.podeAlterar && (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2.5 flex gap-2">
             <button
               type="button"
               onClick={() => setRemarcando((x) => !x)}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+              className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-[13px] font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
             >
-              <CalendarClock className="size-4" />
+              <CalendarClock className="size-3.5" />
               Remarcar
             </button>
             <button
               type="button"
               onClick={() => cancelar.mutate()}
               disabled={cancelar.isPending}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 active:scale-[0.98] disabled:opacity-50"
+              className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 text-[13px] font-medium text-destructive transition-colors hover:bg-destructive/10 active:scale-[0.98] disabled:opacity-50"
             >
               {cancelar.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -404,9 +391,9 @@ function CartaoAgendamento({
             <button
               type="button"
               onClick={() => setAvaliando(true)}
-              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+              className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border bg-card text-[13px] font-medium text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
             >
-              <Star className="size-4" />
+              <Star className="size-3.5" />
               Avaliar este corte
             </button>
           ))}

@@ -150,25 +150,25 @@ export function AgendamentosManager() {
               >
                 <button
                   onClick={() => setAberto(expandido ? null : a.id)}
-                  className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-accent/30"
+                  className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-accent/30"
                 >
                   {/* Horário — bloco de destaque */}
-                  <div className="flex w-[52px] shrink-0 flex-col items-center justify-center rounded-xl bg-muted/70 py-1.5">
-                    <span className="font-mono text-[15px] font-bold leading-none tabular-nums text-foreground">
+                  <div className="flex w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-muted/70 py-1">
+                    <span className="font-mono text-[13px] font-bold leading-none tabular-nums text-foreground">
                       {a.horarioInicio}
                     </span>
-                    <span className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                    <span className="mt-0.5 font-mono text-[9px] text-muted-foreground">
                       {formatarData(dia).slice(0, 5)}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">{a.cliente.nome}</p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="truncate text-[13px] font-semibold text-foreground">{a.cliente.nome}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
                       {a.servicos.map((s) => s.servico.nome).join(", ")}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <span className="font-mono text-sm font-bold tabular-nums text-foreground">
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="font-mono text-[13px] font-bold tabular-nums text-foreground">
                       {formatarPreco(a.valorTotal)}
                     </span>
                     <div className="flex gap-1">

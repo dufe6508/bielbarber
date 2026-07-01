@@ -257,13 +257,11 @@ export function AgendaDia() {
                         </span>
                       </div>
 
-                      {/* Linha 2: serviço/telefone + status */}
+                      {/* Linha 2: serviço + status */}
                       <div className="flex items-center gap-2">
                         <Scissors className="size-3 shrink-0 text-muted-foreground" />
                         <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                           {ag.servicos.join(", ")}
-                          <span className="mx-1 text-muted-foreground/40">·</span>
-                          {formatarTelefone(ag.cliente.telefone)}
                         </p>
                         <div className="flex shrink-0 items-center gap-1">
                           {ag.slots >= 2 && <Pill tom="neutro">2h</Pill>}
@@ -279,10 +277,10 @@ export function AgendaDia() {
                   ) : (
                     <div
                       className={cn(
-                        "flex flex-1 items-center rounded-xl border border-dashed px-3 py-2.5 text-xs",
+                        "flex flex-1 items-center rounded-lg border border-dashed px-3 py-1.5 text-[11px]",
                         ehSegunda
                           ? "border-border bg-muted/40 text-muted-foreground"
-                          : "border-border/60 text-muted-foreground/60"
+                          : "border-border/50 text-muted-foreground/50"
                       )}
                     >
                       {ehSegunda ? "Continuação (2ª hora)" : "Livre"}
