@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { ClientPackage, Package } from "@prisma/client";
 import { notify } from "@/lib/notifications/notify";
@@ -159,14 +160,18 @@ export async function registrarUso(
   ]);
 
   // Avisos automáticos: pacote concluído ou saldo acabando.
+  // after() garante que a notificação seja enviada mesmo se a Vercel encerrar
+  // a function assim que a resposta HTTP sair — "void" sozinho não garante isso.
   if (encerrado) {
-    void notify({ type: "pacote_encerrado", clientePacoteId }).catch(() => {});
+    after(() => notify({ type: "pacote_encerrado", clientePacoteId }).catch(() => {}));
   } else if (restantesDepois != null && restantesDepois <= SALDO_BAIXO && restantesDepois > 0) {
-    void notify({
-      type: "pacote_saldo_baixo",
-      clientePacoteId,
-      restantes: restantesDepois,
-    }).catch(() => {});
+    after(() =>
+      notify({
+        type: "pacote_saldo_baixo",
+        clientePacoteId,
+        restantes: restantesDepois,
+      }).catch(() => {})
+    );
   }
 
   return { ok: true, usosRestantes: restantesDepois, encerrado };

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
@@ -180,10 +180,12 @@ export async function PATCH(request: Request, { params }: Ctx) {
 
   // Notifica bloqueio/desbloqueio (cliente + admin) quando o estado foi tocado.
   if (typeof b.bloqueado === "boolean") {
-    void notify(
-      b.bloqueado
-        ? { type: "bloqueio_acesso", clienteId: id, motivo: cliente.motivoBloqueio ?? undefined }
-        : { type: "desbloqueio_acesso", clienteId: id }
+    after(() =>
+      notify(
+        b.bloqueado
+          ? { type: "bloqueio_acesso", clienteId: id, motivo: cliente.motivoBloqueio ?? undefined }
+          : { type: "desbloqueio_acesso", clienteId: id }
+      ).catch(() => {})
     );
   }
 

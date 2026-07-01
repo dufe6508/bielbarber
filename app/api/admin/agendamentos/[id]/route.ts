@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getFidelidadeMeta } from "@/lib/utils/slots";
@@ -75,25 +75,29 @@ export async function PATCH(request: Request, { params }: Ctx) {
       where: { id: ag.cliente.id },
       data: { carimbos: completou ? 0 : novo },
     });
-    void notify({
-      type: "fidelidade_carimbo",
-      clienteId: ag.cliente.id,
-      carimbos: completou ? meta : novo,
-      faltam: completou ? 0 : meta - novo,
-    });
+    after(() =>
+      notify({
+        type: "fidelidade_carimbo",
+        clienteId: ag.cliente.id,
+        carimbos: completou ? meta : novo,
+        faltam: completou ? 0 : meta - novo,
+      }).catch(() => {})
+    );
   }
 
   // Consumo automático de pacote: ao concluir, desconta de um pacote ativo do
   // cliente que cubra algum serviço do agendamento (sem efeito se não houver).
   if (carimbar) {
-    void consumirPorAgendamento(id).catch(() => {});
+    after(() => consumirPorAgendamento(id).catch(() => {}));
   }
 
   // porCliente:false → notifica só o cliente (admin não alerta a si mesmo).
   if (cancelou) {
-    void notify({ type: "agendamento_cancelado", appointmentId: id, porCliente: false });
+    after(() =>
+      notify({ type: "agendamento_cancelado", appointmentId: id, porCliente: false }).catch(() => {})
+    );
   } else if (remarcou) {
-    void notify({ type: "agendamento_remarcado", appointmentId: id });
+    after(() => notify({ type: "agendamento_remarcado", appointmentId: id }).catch(() => {}));
   }
 
   return NextResponse.json(ag);

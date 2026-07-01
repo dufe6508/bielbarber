@@ -1,10 +1,10 @@
 import { Prisma } from "@prisma/client";
 import type { ChargeMethod, SubscriptionCharge } from "@prisma/client";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
 import { criarPreferencia } from "@/lib/mercadopago";
 import { ativarPacote } from "@/lib/packages";
-import { revalidateTag } from "next/cache";
 import { getSlotsDisponiveis, proximaHora } from "@/lib/utils/slots";
 import { sincronizarAgenda } from "@/lib/calendar";
 
@@ -98,11 +98,13 @@ export async function emitirCobranca(
   // Cria a preferência de pagamento no MP (no-op silencioso sem credencial).
   await garantirPreferencia(charge.id);
 
-  void notify({
-    type: "cobranca_emitida",
-    chargeId: charge.id,
-    valor,
-  });
+  after(() =>
+    notify({
+      type: "cobranca_emitida",
+      chargeId: charge.id,
+      valor,
+    }).catch(() => {})
+  );
 
   return prisma.subscriptionCharge.findUnique({ where: { id: charge.id } });
 }
@@ -308,11 +310,13 @@ export async function confirmarPagamento(
     });
   });
 
-  void notify({
-    type: "cobranca_confirmada",
-    chargeId: charge.id,
-    valor: Number(charge.valor),
-  });
+  after(() =>
+    notify({
+      type: "cobranca_confirmada",
+      chargeId: charge.id,
+      valor: Number(charge.valor),
+    }).catch(() => {})
+  );
 
   return atualizado;
 }
@@ -445,16 +449,17 @@ async function confirmarAgendamentoCharge(
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    revalidateTag(`slots-${reserva.data}`, {});
-    void notify({ type: "agendamento_confirmado", appointmentId: ag.id });
-    void sincronizarAgenda(ag.id, ["admin", "cliente"]);
+    after(() => notify({ type: "agendamento_confirmado", appointmentId: ag.id }).catch(() => {}));
+    after(() => sincronizarAgenda(ag.id, ["admin", "cliente"]));
     return marcarPago(ag.id);
   } catch (err) {
     // Horário tomado durante o pagamento (raro). Não perde o dinheiro: marca a
     // cobrança paga e avisa o admin pra reagendar/estornar com o cliente.
     // ponytail: aceitável p/ volume baixo; reembolso fica manual.
     console.error("[charges] conflito ao confirmar agendamento", charge.id, err);
-    void notify({ type: "cobranca_confirmada", chargeId: charge.id, valor: Number(charge.valor) });
+    after(() =>
+      notify({ type: "cobranca_confirmada", chargeId: charge.id, valor: Number(charge.valor) }).catch(() => {})
+    );
     return prisma.subscriptionCharge.update({
       where: { id: charge.id },
       data: {
@@ -488,12 +493,14 @@ export async function reenviarCobranca(chargeId: string): Promise<void> {
     where: { id: chargeId },
     data: { ultimoLembrete: new Date() },
   });
-  void notify({
-    type: "cobranca_lembrete",
-    chargeId: charge.id,
-    valor: Number(charge.valor),
-    vencido: charge.status === "vencido",
-  });
+  after(() =>
+    notify({
+      type: "cobranca_lembrete",
+      chargeId: charge.id,
+      valor: Number(charge.valor),
+      vencido: charge.status === "vencido",
+    }).catch(() => {})
+  );
 }
 
 // Rotina do cron: marca cobranças vencidas e dispara lembretes escalonados.
@@ -516,12 +523,14 @@ export async function processarVencimentos(): Promise<{
       where: { id: c.id },
       data: { status: "vencido", ultimoLembrete: new Date() },
     });
-    void notify({
-      type: "cobranca_lembrete",
-      chargeId: c.id,
-      valor: Number(c.valor),
-      vencido: true,
-    });
+    after(() =>
+      notify({
+        type: "cobranca_lembrete",
+        chargeId: c.id,
+        valor: Number(c.valor),
+        vencido: true,
+      }).catch(() => {})
+    );
   }
 
   // 2) vencidas antigas → lembrete a cada ~3 dias
@@ -539,12 +548,14 @@ export async function processarVencimentos(): Promise<{
       where: { id: c.id },
       data: { ultimoLembrete: new Date() },
     });
-    void notify({
-      type: "cobranca_lembrete",
-      chargeId: c.id,
-      valor: Number(c.valor),
-      vencido: true,
-    });
+    after(() =>
+      notify({
+        type: "cobranca_lembrete",
+        chargeId: c.id,
+        valor: Number(c.valor),
+        vencido: true,
+      }).catch(() => {})
+    );
   }
 
   return { vencidas: aVencer.length, lembretes: aVencer.length + reincidentes.length };

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notifications/notify";
@@ -104,7 +104,7 @@ export async function PATCH(
       where: { id },
       data: { rating, ratingComentario: comentario, ratingEm: new Date() },
     });
-    void notify({ type: "avaliacao_recebida", appointmentId: id });
+    after(() => notify({ type: "avaliacao_recebida", appointmentId: id }).catch(() => {}));
     return NextResponse.json({ ok: true, rating });
   }
 
@@ -129,7 +129,7 @@ export async function PATCH(
       where: { id },
       data: { checkinEm: new Date() },
     });
-    void notify({ type: "checkin_realizado", appointmentId: id });
+    after(() => notify({ type: "checkin_realizado", appointmentId: id }).catch(() => {}));
     return NextResponse.json({ ok: true, checkinEm: atualizado.checkinEm });
   }
 
@@ -155,7 +155,7 @@ export async function PATCH(
       data: { status: "cancelado" },
     });
     // Cliente cancelou → confirma p/ ele + avisa o admin.
-    void notify({ type: "agendamento_cancelado", appointmentId: id, porCliente: true });
+    after(() => notify({ type: "agendamento_cancelado", appointmentId: id, porCliente: true }).catch(() => {}));
     // Abriu horário → notifica quem está na fila daquele dia.
     await avisarListaEspera(agendamento.data);
     return NextResponse.json({ ok: true, status: atualizado.status });
@@ -201,7 +201,7 @@ export async function PATCH(
       where: { id },
       data: { data: new Date(data), horarioInicio: horario },
     });
-    void notify({ type: "agendamento_remarcado", appointmentId: id });
+    after(() => notify({ type: "agendamento_remarcado", appointmentId: id }).catch(() => {}));
     return NextResponse.json({
       ok: true,
       data: atualizado.data,

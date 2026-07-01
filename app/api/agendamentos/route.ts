@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { proximaHora, getSlotsDisponiveis } from "@/lib/utils/slots";
@@ -223,14 +223,18 @@ export async function POST(request: Request) {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     // Notifica cliente (confirmação) + admin (novo agendamento). Best-effort.
-    void notify({
-      type: "agendamento_confirmado",
-      appointmentId: agendamento.id,
-    });
+    // after() garante que roda até o fim mesmo depois da resposta HTTP sair —
+    // "void" sozinho arrisca a Vercel matar a function antes da promise terminar.
+    after(() =>
+      notify({
+        type: "agendamento_confirmado",
+        appointmentId: agendamento.id,
+      }).catch(() => {})
+    );
 
-    // Sincroniza com agendas nativas (admin + cliente). No-op enquanto não houver
-    // provider de API habilitado — a arquitetura já fica pronta para ativar depois.
-    void sincronizarAgenda(agendamento.id, ["admin", "cliente"]);
+    // Sincroniza com agendas nativas (admin + cliente). No-op se nenhum provider
+    // de API estiver habilitado.
+    after(() => sincronizarAgenda(agendamento.id, ["admin", "cliente"]));
 
     // Código curto para o ticket
     const codigo = agendamento.id.slice(0, 8).toUpperCase();

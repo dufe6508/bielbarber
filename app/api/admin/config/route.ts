@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import {
@@ -49,7 +49,7 @@ export async function PUT(request: Request) {
     if (dias > anterior) {
       const ate = new Date();
       ate.setDate(ate.getDate() + dias);
-      void notify({ type: "agenda_liberada", ateData: dataISOLocal(ate) });
+      after(() => notify({ type: "agenda_liberada", ateData: dataISOLocal(ate) }).catch(() => {}));
     }
   }
 
