@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2, Lock, Store, Upload } from "lucide-react";
+import { Calendar, Check, Loader2, Lock, Store, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { GoogleCalendarConexao } from "./GoogleCalendarConexao";
 import { Logo } from "@/components/Logo";
 
 const inputCls =
@@ -250,6 +251,15 @@ export function ConfigManager() {
           {salvandoSenha ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
           Alterar senha
         </button>
+      </Secao>
+
+      {/* ── Google Calendar ─────────────────────────────── */}
+      <Secao icone={<Calendar className="size-4" />} titulo="Google Calendar">
+        <p className="mb-4 text-sm text-muted-foreground">
+          Conecte sua conta Google para que cada agendamento criado apareça
+          automaticamente no seu Google Calendar.
+        </p>
+        <GoogleCalendarConexao />
       </Secao>
     </div>
   );
