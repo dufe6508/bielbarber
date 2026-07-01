@@ -17,9 +17,14 @@ export async function GET() {
     where: { chave: CHAVE_GOOGLE_CALENDAR_ID },
   });
 
+  const ultimoErro = await prisma.setting.findUnique({
+    where: { chave: "google_calendar_ultimo_erro" },
+  });
+
   return NextResponse.json({
     conectado: Boolean(token?.valor),
     calendarId: calendarId?.valor ?? "primary",
+    ultimoErro: ultimoErro?.valor ?? null,
   });
 }
 

@@ -48,6 +48,11 @@ export async function eventoDoAgendamento(
   };
 }
 
+// Chave onde o último erro de sync do Google é guardado — lido pelo painel
+// admin (GoogleCalendarConexao) já que logs de runtime não ficam disponíveis
+// via `vercel logs` no plano atual.
+const CHAVE_GOOGLE_ULTIMO_ERRO = "google_calendar_ultimo_erro";
+
 // Dispatcher de sincronização — chamado quando um agendamento é criado.
 // Hoje é no-op (nenhum provider de API habilitado): a criação real de evento
 // acontece pelo caminho local (botão "Adicionar à agenda" / rota ICS). Quando um
@@ -75,6 +80,21 @@ export async function sincronizarAgenda(
         )
       )
     );
+
+    // Registra o último erro do Google (ou limpa se deu tudo certo) — visível
+    // no painel em vez de só no console do servidor.
+    const erroGoogle = resultados.find((r) => r.provider === "google" && !r.ok);
+    const okGoogle = resultados.some((r) => r.provider === "google" && r.ok);
+    if (erroGoogle) {
+      await prisma.setting.upsert({
+        where: { chave: CHAVE_GOOGLE_ULTIMO_ERRO },
+        update: { valor: `${new Date().toISOString()} — ${erroGoogle.motivo}` },
+        create: { chave: CHAVE_GOOGLE_ULTIMO_ERRO, valor: `${new Date().toISOString()} — ${erroGoogle.motivo}` },
+      }).catch(() => {});
+    } else if (okGoogle) {
+      await prisma.setting.deleteMany({ where: { chave: CHAVE_GOOGLE_ULTIMO_ERRO } }).catch(() => {});
+    }
+
     return resultados;
   } catch (e) {
     console.error("[calendar] falha ao sincronizar agenda", appointmentId, e);

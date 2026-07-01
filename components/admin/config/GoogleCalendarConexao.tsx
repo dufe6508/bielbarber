@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarCheck, CalendarX2, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CalendarCheck, CalendarX2, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-type Status = { conectado: boolean; calendarId: string } | null;
+type Status = { conectado: boolean; calendarId: string; ultimoErro: string | null } | null;
 
 export function GoogleCalendarConexao() {
   const [status, setStatus] = useState<Status>(null);
@@ -86,6 +86,21 @@ export function GoogleCalendarConexao() {
             </p>
           </div>
         </div>
+
+        {/* Último erro de sincronização, se houver */}
+        {status.ultimoErro && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                Última tentativa de sincronizar falhou
+              </p>
+              <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                {status.ultimoErro}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Ações */}
         <div className="flex flex-wrap gap-2">
