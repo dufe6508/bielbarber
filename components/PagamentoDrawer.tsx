@@ -107,7 +107,7 @@ export function PagamentoDrawer({
       });
       const d = await res.json().catch(() => null);
       if (!res.ok || !d) {
-        toast.error(d?.error ?? "Não foi possível gerar o Pix. Tente novamente.");
+        toast.error(d?.detalhe ?? d?.error ?? "Não foi possível gerar o Pix. Tente novamente.");
         return;
       }
       if (d.pix?.qrCode) {

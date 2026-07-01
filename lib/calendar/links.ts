@@ -17,8 +17,8 @@ export function linkGoogleAgenda(evento: CalendarEvent): string {
     text: evento.titulo,
     dates: `${dt(evento.inicio.data, evento.inicio.hora)}/${dt(evento.fim.data, evento.fim.hora)}`,
     details: evento.descricao,
-    location: evento.local,
   });
+  if (evento.local) params.set("location", evento.local);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
@@ -29,9 +29,9 @@ export function linkOutlookAgenda(evento: CalendarEvent): string {
     rru: "addevent",
     subject: evento.titulo,
     body: evento.descricao,
-    location: evento.local,
     startdt: `${evento.inicio.data}T${evento.inicio.hora}:00`,
     enddt: `${evento.fim.data}T${evento.fim.hora}:00`,
   });
+  if (evento.local) params.set("location", evento.local);
   return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
 }

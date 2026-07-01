@@ -1,12 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import type { CalendarEvent, CalendarTarget, SyncResult } from "./types";
 import { providersHabilitados } from "./providers";
+import { formatarPreco, formatarTelefone } from "@/lib/utils/format";
 
 export type { CalendarEvent, CalendarTarget, SyncResult } from "./types";
 export { gerarICS } from "./ics";
 export { linkGoogleAgenda, linkOutlookAgenda } from "./links";
-
-const ENDERECO = "Av. Serrinha, 82 · Vale do Jatobá, BH · 30692-600";
 
 // "HH:MM" + n horas → "HH:MM" (mesmo dia; a barbearia opera dentro do dia).
 function somarHoras(hora: string, horas: number): string {
@@ -32,19 +31,26 @@ export async function eventoDoAgendamento(
   const horaFim = somarHoras(ag.horarioInicio, Math.max(1, ag.slots));
   const servicos = ag.servicos.map((s) => s.servico.nome);
 
+  // Título com informação além do nome (cliente · serviço) — é o que aparece na
+  // grade da agenda. Sem localização/endereço: o `local` fica vazio de propósito
+  // (o barbeiro pediu para não mostrar o endereço no evento).
+  const titulo = servicos.length
+    ? `${ag.cliente.nome} · ${servicos.join(" + ")}`
+    : ag.cliente.nome;
+
   return {
     uid: `${ag.id}@bielbarber`,
-    // Título e descrição priorizam cliente/serviço/horário — empresa e endereço
-    // ficam em campos secundários (location), não no destaque principal do evento.
-    titulo: ag.cliente.nome,
+    titulo,
     descricao: [
+      `Cliente: ${ag.cliente.nome}`,
       servicos.length ? `Serviço: ${servicos.join(", ")}` : null,
       `Horário: ${ag.horarioInicio}`,
-      `Biel Barber Shop`,
+      ag.cliente.telefone ? `Telefone: ${formatarTelefone(ag.cliente.telefone)}` : null,
+      `Valor: ${formatarPreco(Number(ag.valorTotal))}`,
     ]
       .filter(Boolean)
       .join("\n"),
-    local: ENDERECO,
+    local: "",
     inicio: { data: dataISO, hora: ag.horarioInicio },
     fim: { data: dataISO, hora: horaFim },
     cliente: { nome: ag.cliente.nome, telefone: ag.cliente.telefone },

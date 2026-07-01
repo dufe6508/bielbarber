@@ -48,7 +48,8 @@ export function gerarICS(evento: CalendarEvent): string {
     `DTEND:${dt(evento.fim.data, evento.fim.hora)}`,
     `SUMMARY:${esc(evento.titulo)}`,
     `DESCRIPTION:${esc(evento.descricao)}`,
-    `LOCATION:${esc(evento.local)}`,
+    // LOCATION só entra quando há endereço — vazio = sem localização no evento.
+    ...(evento.local ? [`LOCATION:${esc(evento.local)}`] : []),
     "END:VEVENT",
     "END:VCALENDAR",
   ];

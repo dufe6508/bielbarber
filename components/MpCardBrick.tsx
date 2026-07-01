@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { initMercadoPago, CardPayment } from "@mercadopago/sdk-react";
 
 // Brick de cartão do Mercado Pago (Card Payment) — SÓ o formulário de cartão,
@@ -74,8 +74,8 @@ export function MpCardBrick({
     }
     const d = await res.json().catch(() => null);
     if (!res.ok) {
-      onErroRef.current?.(d?.error);
-      throw new Error(d?.error ?? "Falha no pagamento");
+      onErroRef.current?.(d?.detalhe ?? d?.error);
+      throw new Error(d?.detalhe ?? d?.error ?? "Falha no pagamento");
     }
     if (d?.status === "approved") {
       onResultRef.current({ tipo: "aprovado" });
@@ -90,25 +90,17 @@ export function MpCardBrick({
     // chargeId é estável durante a sessão — OK como dep.
   }, [chargeId]);
 
+  // O wrapper React do Brick re-inicializa sempre que `initialization` muda de
+  // referência (está nas deps do useEffect dele). Passar `{ amount }` inline
+  // criava um objeto novo a cada render do drawer, o que fazia o Brick ficar
+  // preso no skeleton. Memoizar mantém a referência estável.
+  const initialization = useMemo(() => ({ amount }), [amount]);
+
   if (!PUB) return null;
 
   return (
     <CardPayment
-      initialization={{ amount }}
-      customization={{
-        visual: {
-          style: {
-            customVariables: {
-              baseColor: "#1c1d20",
-              textPrimaryColor: "#18191b",
-              textSecondaryColor: "#6b6d72",
-              borderRadiusMedium: "12px",
-              borderRadiusLarge: "16px",
-            },
-          },
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any}
+      initialization={initialization}
       onReady={handleReady}
       onError={handleError}
       onSubmit={handleSubmit}

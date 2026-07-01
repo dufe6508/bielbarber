@@ -86,7 +86,8 @@ const google: CalendarProvider = {
     const body = {
       summary: evento.titulo,
       description: evento.descricao,
-      location: evento.local,
+      // location omitido quando vazio — evento sem endereço.
+      ...(evento.local ? { location: evento.local } : {}),
       start: {
         dateTime: toRFC3339Local(evento.inicio.data, evento.inicio.hora),
         timeZone: "America/Sao_Paulo",

@@ -15,6 +15,20 @@ function emailPix(telefone: string): string {
   return `pix.${so}@bielbarber.com.br`;
 }
 
+// Extrai uma mensagem legível do erro do SDK do Mercado Pago. O motivo real
+// costuma vir em `cause: [{ code, description }]`; caímos para `message` senão.
+function detalheErroMP(err: unknown): string {
+  const e = err as {
+    cause?: { description?: string; code?: string | number }[];
+    message?: string;
+    status?: number;
+  };
+  const c = Array.isArray(e?.cause) ? e.cause[0] : undefined;
+  if (c?.description) return `${c.description}${c.code ? ` (${c.code})` : ""}`;
+  if (typeof e?.message === "string" && e.message) return e.message;
+  return "erro desconhecido no gateway";
+}
+
 // POST — processa o pagamento de uma cobrança a partir do formData do Brick de
 // cartão OU de um pedido direto de Pix ({ payment_method_id: "pix" }). O valor
 // cobrado é SEMPRE o da cobrança no banco (nunca o que vem do cliente). Cartão
@@ -64,8 +78,12 @@ export async function POST(request: Request) {
       formData: fd,
     });
   } catch (err) {
-    console.error("[mp/processar] erro ao criar pagamento", err);
-    return NextResponse.json({ error: "Falha ao processar pagamento" }, { status: 502 });
+    const detalhe = detalheErroMP(err);
+    console.error("[mp/processar] erro ao criar pagamento:", detalhe, err);
+    return NextResponse.json(
+      { error: "Falha ao processar pagamento", detalhe },
+      { status: 502 }
+    );
   }
   if (!pag) {
     return NextResponse.json({ error: "Pagamento indisponível" }, { status: 503 });
